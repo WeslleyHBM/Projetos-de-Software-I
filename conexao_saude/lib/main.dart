@@ -1,7 +1,36 @@
+import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'firebase_options.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  // Garante que os plugins nativos sejam carregados antes do app iniciar
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa o firebase com as configs geradas do cli
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Inicializa o hive pra armazenamento local de dados no Zorin OS
+  await Hive.initFlutter();
+
+  // 1. Registra o adaptador do Medicamento (o objeto interno)
+  Hive.registerAdapter(MedicamentoModelAdapter());
+
+  // 2. Registra o adaptador da Lista (o objeto principal)
+  Hive.registerAdapter(ListaMedicamentoModelAdapter());
+
+  // 3. Abre a caixa que vai guardar as listas (ex: "Remédios Pressão", "Suplementos")
+  // Usamos ListaMedicamentoModel como o tipo da Box
+  await Hive.openBox<ListaMedicamentoModel>('minhas_listas');
+
+  runApp(
+    // Adicionado o ProviderScope para você já poder usar o Riverpod que conversamos
+    const ProviderScope(child: MyApp()),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -28,7 +57,7 @@ class MyApp extends StatelessWidget {
         //
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
@@ -102,7 +131,7 @@ class _MyHomePageState extends State<MyHomePage> {
           // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
           // action in the IDE, or press "p" in the console), to see the
           // wireframe for each widget.
-          mainAxisAlignment: .center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text('You have pushed the button this many times:'),
             Text(

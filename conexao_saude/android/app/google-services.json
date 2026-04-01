@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "363352659444",
+    "project_id": "conexao-saude-1ac50",
+    "storage_bucket": "conexao-saude-1ac50.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:363352659444:android:39b26928af1aac075055a1",
+        "android_client_info": {
+          "package_name": "com.example.conexao_saude"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPMaJb7ZasrSyJKSZR5LVpC9bqrdAODPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
