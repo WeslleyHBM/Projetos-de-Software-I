@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'conexao-saude-1ac50.firebasestorage.app',
     measurementId: 'G-SDRN0ZVD30',
   );
+
 }
