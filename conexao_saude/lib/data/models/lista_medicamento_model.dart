@@ -10,8 +10,15 @@ class MedicamentoModel extends HiveObject {
   final String dose;
   @HiveField(2)
   final String horario;
+  @HiveField(3)
+  final List<String> diasSemana;
 
-  MedicamentoModel({required this.nome, required this.dose, required this.horario});
+  MedicamentoModel({
+    required this.nome,
+    required this.dose,
+    required this.horario,
+    required this.diasSemana,
+  });
 }
 
 @HiveType(typeId: 1) // ID diferente para a lista

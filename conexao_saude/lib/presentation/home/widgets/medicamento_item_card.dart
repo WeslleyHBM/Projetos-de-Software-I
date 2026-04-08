@@ -6,6 +6,7 @@ class MedicamentoItemCard extends StatelessWidget {
   final String quantidade;
   final String hora;
   final String data;
+  final String? diasSemana;
   final String? imageUrl;
 
   const MedicamentoItemCard({
@@ -14,6 +15,7 @@ class MedicamentoItemCard extends StatelessWidget {
     required this.quantidade,
     required this.hora,
     required this.data,
+    this.diasSemana,
     this.imageUrl,
   });
 
@@ -56,9 +58,14 @@ class MedicamentoItemCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _InfoChip(icon: Icons.medication_outlined, label: 'Qtd: $quantidade'),
+                    _InfoChip(
+                      icon: Icons.medication_outlined,
+                      label: 'Qtd: $quantidade',
+                    ),
                     _InfoChip(icon: Icons.access_time, label: hora),
                     _InfoChip(icon: Icons.calendar_month, label: data),
+                    if (diasSemana != null && diasSemana!.trim().isNotEmpty)
+                      _InfoChip(icon: Icons.event_repeat, label: diasSemana!),
                   ],
                 ),
               ],

@@ -20,19 +20,22 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       nome: fields[0] as String,
       dose: fields[1] as String,
       horario: fields[2] as String,
+      diasSemana: (fields[3] as List?)?.cast<String>() ?? const <String>[],
     );
   }
 
   @override
   void write(BinaryWriter writer, MedicamentoModel obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.nome)
       ..writeByte(1)
       ..write(obj.dose)
       ..writeByte(2)
-      ..write(obj.horario);
+      ..write(obj.horario)
+      ..writeByte(3)
+      ..write(obj.diasSemana);
   }
 
   @override
