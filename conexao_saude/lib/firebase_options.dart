@@ -29,10 +29,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.windows:
         return windows;
       case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return linux;
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -77,6 +74,16 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCLNGV_q_toXxBX_oLeSJUexSEfZTTGz4s',
+    appId: '1:363352659444:web:e90c9dfbb41fbdb85055a1',
+    messagingSenderId: '363352659444',
+    projectId: 'conexao-saude-1ac50',
+    authDomain: 'conexao-saude-1ac50.firebaseapp.com',
+    storageBucket: 'conexao-saude-1ac50.firebasestorage.app',
+    measurementId: 'G-SDRN0ZVD30',
+  );
+
+  static const FirebaseOptions linux = FirebaseOptions(
     apiKey: 'AIzaSyCLNGV_q_toXxBX_oLeSJUexSEfZTTGz4s',
     appId: '1:363352659444:web:e90c9dfbb41fbdb85055a1',
     messagingSenderId: '363352659444',

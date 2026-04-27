@@ -1,5 +1,6 @@
 import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
 import 'package:conexao_saude/core/theme/app_theme.dart';
+import 'package:conexao_saude/core/services/notification_service.dart';
 import 'package:conexao_saude/presentation/home/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -26,6 +27,13 @@ Future<void> main() async {
   // Usamos ListaMedicamentoModel como o tipo da Box
   await Hive.openBox<ListaMedicamentoModel>('minhas_listas');
 
+  // 4. Inicializa o serviço de notificações
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+
+  // 5. Reagenda notificações ao iniciar o app (caso tenham sido perdidas)
+  await _reagendarNotificacoes();
+
   runApp(
     // Adicionado o ProviderScope para você já poder usar o Riverpod que conversamos
     const ProviderScope(child: ConexaoSaudeApp()),
@@ -40,6 +48,37 @@ Future<void> _initializeFirebaseSafely() async {
     );
   } on UnsupportedError catch (error) {
     debugPrint('Firebase nao configurado para esta plataforma: $error');
+  }
+}
+
+Future<void> _reagendarNotificacoes() async {
+  try {
+    final notificationService = NotificationService();
+    final listasBox = Hive.box<ListaMedicamentoModel>('minhas_listas');
+    
+    // Pega todos os medicamentos salvos
+    final lista = listasBox.get('lista_home_inicial');
+    if (lista == null) return;
+
+    // Reagenda notificações para cada medicamento ativo
+    for (int index = 0; index < lista.medicamentos.length; index++) {
+      final medicamento = lista.medicamentos[index];
+      
+      // Verifica se o tratamento ainda está ativo
+      if (medicamento.estaAtivoHoje) {
+        await notificationService.agendarNotificacoesRecorrentes(
+          medicamentoId: index,
+          medicamentoNome: medicamento.nome,
+          dose: medicamento.dose,
+          horario: medicamento.horario,
+          diasSemana: medicamento.diasSemana,
+          dataInicio: medicamento.dataInicio,
+          dataFim: medicamento.dataFim,
+        );
+      }
+    }
+  } catch (e) {
+    debugPrint('Erro ao reagendar notificações: $e');
   }
 }
 

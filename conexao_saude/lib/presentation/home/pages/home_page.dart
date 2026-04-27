@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:conexao_saude/core/theme/app_colors.dart';
+import 'package:conexao_saude/core/services/notification_service.dart';
 import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
 import 'package:conexao_saude/presentation/home/widgets/medicamento_item_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -13,48 +17,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const String _listaHomeKey = 'lista_home_inicial';
-  static const List<String> _diasSemanaPadrao = [
-    'Seg',
-    'Ter',
-    'Qua',
-    'Qui',
-    'Sex',
-    'Sab',
-    'Dom',
-  ];
-
-  static const List<_MedicamentoCatalogo> _catalogoFake = [
-    _MedicamentoCatalogo(
-      nome: 'Dipirona',
-      dosePadrao: '1 comprimido',
-      horarioPadrao: '08:00',
-    ),
-    _MedicamentoCatalogo(
-      nome: 'Vitamina D',
-      dosePadrao: '2 gotas',
-      horarioPadrao: '12:30',
-    ),
-    _MedicamentoCatalogo(
-      nome: 'Losartana',
-      dosePadrao: '1 comprimido',
-      horarioPadrao: '20:00',
-    ),
-    _MedicamentoCatalogo(
-      nome: 'Paracetamol',
-      dosePadrao: '1 comprimido',
-      horarioPadrao: '14:00',
-    ),
-    _MedicamentoCatalogo(
-      nome: 'Omeprazol',
-      dosePadrao: '1 capsula',
-      horarioPadrao: '07:00',
-    ),
-  ];
+  static const String _colecaoRemume = 'remume_santa_maria';
 
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   String _searchTerm = '';
   List<MedicamentoModel> _medicamentosSalvos = [];
+  List<_MedicamentoCatalogoFirestore> _resultadosPesquisa = [];
   bool _isLoading = true;
+  bool _isSearching = false;
+  String? _searchError;
+  final _notificationService = NotificationService();
 
   Box<ListaMedicamentoModel> get _listasBox =>
       Hive.box<ListaMedicamentoModel>('minhas_listas');
@@ -67,6 +40,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -99,6 +73,9 @@ class _HomePageState extends State<HomePage> {
     required String dose,
     required String horario,
     required List<String> diasSemana,
+    required DateTime dataInicio,
+    required DateTime dataFim,
+    required int intervaloHoras,
   }) async {
     final listaAtual = _listasBox.get(_listaHomeKey);
     final medicamentos = listaAtual == null
@@ -121,14 +98,17 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    medicamentos.add(
-      MedicamentoModel(
-        nome: nome,
-        dose: dose,
-        horario: horario,
-        diasSemana: diasSemana,
-      ),
+    final novoMedicamento = MedicamentoModel(
+      nome: nome,
+      dose: dose,
+      horario: horario,
+      diasSemana: diasSemana,
+      dataInicio: dataInicio,
+      dataFim: dataFim,
+      intervaloHoras: intervaloHoras,
     );
+
+    medicamentos.add(novoMedicamento);
 
     await _listasBox.put(
       _listaHomeKey,
@@ -136,6 +116,17 @@ class _HomePageState extends State<HomePage> {
         titulo: 'Lista inicial',
         medicamentos: medicamentos,
       ),
+    );
+
+    // Agenda as notificações
+    await _notificationService.agendarNotificacoesRecorrentes(
+      medicamentoId: medicamentos.indexOf(novoMedicamento),
+      medicamentoNome: nome,
+      dose: dose,
+      horario: horario,
+      diasSemana: diasSemana,
+      dataInicio: dataInicio,
+      dataFim: dataFim,
     );
 
     if (!mounted) return;
@@ -148,10 +139,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _abrirDialogoAdicionar(_MedicamentoCatalogo item) async {
-    final doseController = TextEditingController(text: item.dosePadrao);
-    final horarioController = TextEditingController(text: item.horarioPadrao);
-    final diasSelecionados = <String>[];
+  Future<void> _abrirDialogoAdicionar(_MedicamentoCatalogoFirestore item) async {
+    final doseController = TextEditingController(
+      text: item.concentracao.isNotEmpty ? item.concentracao : '1 comprimido',
+    );
+    final horarioController = TextEditingController(text: '08:00');
+    DateTime dataInicio = DateTime.now();
+    DateTime dataFim = DateTime.now().add(const Duration(days: 30));
+    int intervaloHoras = 8;
 
     final confirmado = await showDialog<bool>(
       context: context,
@@ -181,29 +176,93 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  'Dias da semana',
+                  'Data de Início',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _diasSemanaPadrao.map((dia) {
-                    final selecionado = diasSelecionados.contains(dia);
-                    return FilterChip(
-                      label: Text(dia),
-                      selected: selecionado,
-                      onSelected: (value) {
-                        setDialogState(() {
-                          if (value) {
-                            diasSelecionados.add(dia);
-                          } else {
-                            diasSelecionados.remove(dia);
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(_formatarData(dataInicio)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 100,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final data = await showDatePicker(
+                            context: context,
+                            initialDate: dataInicio,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (data != null) {
+                            setDialogState(() {
+                              dataInicio = data;
+                              if (dataFim.isBefore(dataInicio)) {
+                                dataFim = dataInicio.add(const Duration(days: 30));
+                              }
+                            });
                           }
-                        });
-                      },
-                    );
-                  }).toList(),
+                        },
+                        child: const Text('Alterar'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Data de Término',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(_formatarData(dataFim)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 100,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final data = await showDatePicker(
+                            context: context,
+                            initialDate: dataFim,
+                            firstDate: dataInicio,
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (data != null) {
+                            setDialogState(() {
+                              dataFim = data;
+                            });
+                          }
+                        },
+                        child: const Text('Alterar'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Intervalo entre doses (horas)',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                DropdownButton<int>(
+                  value: intervaloHoras,
+                  isExpanded: true,
+                  items: [4, 6, 8, 12, 24]
+                      .map((valor) => DropdownMenuItem(
+                            value: valor,
+                            child: Text('$valor horas'),
+                          ))
+                      .toList(),
+                  onChanged: (valor) {
+                    setDialogState(() {
+                      intervaloHoras = valor ?? 8;
+                    });
+                  },
                 ),
               ],
             ),
@@ -247,19 +306,14 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    if (diasSelecionados.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione pelo menos um dia da semana.')),
-      );
-      return;
-    }
-
     await _adicionarMedicamentoNoHive(
       nome: item.nome,
       dose: dose,
       horario: horario,
-      diasSemana: List<String>.from(diasSelecionados),
+      diasSemana: const [], // Agora sempre vazio, usa intervalo de datas
+      dataInicio: dataInicio,
+      dataFim: dataFim,
+      intervaloHoras: intervaloHoras,
     );
   }
 
@@ -308,11 +362,7 @@ class _HomePageState extends State<HomePage> {
                 TextField(
                   controller: _searchController,
                   textInputAction: TextInputAction.search,
-                  onChanged: (value) {
-                    setState(() {
-                      _searchTerm = value.trim();
-                    });
-                  },
+                  onChanged: _onSearchChanged,
                   onSubmitted: (_) => _onSearch(),
                   decoration: InputDecoration(
                     filled: true,
@@ -352,7 +402,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildWhiteBody() {
-    final resultadosBusca = _filtrarCatalogo(_catalogoFake);
     final dataHoje = _formatarData(DateTime.now());
 
     return Container(
@@ -407,6 +456,9 @@ class _HomePageState extends State<HomePage> {
                     hora: item.horario,
                     data: dataHoje,
                     diasSemana: _formatarDiasSemana(item.diasSemana),
+                    duracao: '${item.duracaoDias} dias',
+                    dataInicio: _formatarData(item.dataInicio),
+                    dataFim: _formatarData(item.dataFim),
                     imageUrl: null,
                   ),
                 ),
@@ -425,14 +477,22 @@ class _HomePageState extends State<HomePage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary),
                 )
-              else if (resultadosBusca.isEmpty)
+              else if (_isSearching)
+                const Center(child: CircularProgressIndicator())
+              else if (_searchError != null)
+                Text(
+                  _searchError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent),
+                )
+              else if (_resultadosPesquisa.isEmpty)
                 Text(
                   'Nenhum remedio encontrado para "$_searchTerm".',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.textSecondary),
                 )
               else
-                ...resultadosBusca.map(
+                ..._resultadosPesquisa.map(
                   (item) => Container(
                     margin: const EdgeInsets.only(top: 10),
                     padding: const EdgeInsets.all(12),
@@ -463,7 +523,15 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Dose padrao: ${item.dosePadrao} | Hora: ${item.horarioPadrao}',
+                                'Concentração: ${item.concentracao} | Forma: ${item.formaFarmaceutica}',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Componente: ${item.componente}',
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 12,
@@ -493,22 +561,117 @@ class _HomePageState extends State<HomePage> {
 
   void _onSearch() {
     FocusScope.of(context).unfocus();
+    _buscarMedicamentosFirestore();
+  }
+
+  void _onSearchChanged(String value) {
+    final termo = value.trim();
+
     setState(() {
-      _searchTerm = _searchController.text.trim();
+      _searchTerm = termo;
+    });
+
+    _searchDebounce?.cancel();
+
+    if (termo.isEmpty) {
+      setState(() {
+        _resultadosPesquisa = [];
+        _searchError = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _buscarMedicamentosFirestore();
     });
   }
 
-  List<_MedicamentoCatalogo> _filtrarCatalogo(
-    List<_MedicamentoCatalogo> itens,
-  ) {
-    if (_searchTerm.isEmpty) {
-      return const [];
+  Future<void> _buscarMedicamentosFirestore() async {
+    final termo = _searchController.text.trim();
+
+    if (termo.isEmpty) {
+      setState(() {
+        _searchTerm = '';
+        _resultadosPesquisa = [];
+        _searchError = null;
+        _isSearching = false;
+      });
+      return;
     }
 
-    final termo = _normalizarTexto(_searchTerm);
-    return itens
-        .where((item) => _normalizarTexto(item.nome).contains(termo))
-        .toList();
+    setState(() {
+      _searchTerm = termo;
+      _isSearching = true;
+      _searchError = null;
+      _resultadosPesquisa = [];
+    });
+
+    try {
+      final termoNormalizado = _normalizarTexto(termo);
+      final collection = FirebaseFirestore.instance.collection(_colecaoRemume);
+
+      final consultas = await Future.wait([
+        collection
+            .orderBy('nomeNormalizado')
+            .startAt([termoNormalizado])
+            .endAt(['$termoNormalizado\uf8ff'])
+            .get(),
+        collection
+            .orderBy('componenteNormalizado')
+            .startAt([termoNormalizado])
+            .endAt(['$termoNormalizado\uf8ff'])
+            .get(),
+      ]);
+
+      final resultadosPorId = <String, _MedicamentoCatalogoFirestore>{};
+
+      for (final snapshot in consultas) {
+        for (final doc in snapshot.docs) {
+          final item = _MedicamentoCatalogoFirestore.fromFirestore(doc.id, doc.data());
+          resultadosPorId[doc.id] = item;
+        }
+      }
+
+      if (resultadosPorId.isEmpty) {
+        final fallbackSnapshot = await collection.get();
+        for (final doc in fallbackSnapshot.docs) {
+          final item = _MedicamentoCatalogoFirestore.fromFirestore(doc.id, doc.data());
+          final nomeNormalizado = _normalizarTexto(item.nome);
+          final componenteNormalizado = _normalizarTexto(item.componente);
+          if (nomeNormalizado.contains(termoNormalizado) ||
+              componenteNormalizado.contains(termoNormalizado)) {
+            resultadosPorId[doc.id] = item;
+          }
+        }
+      }
+
+      final resultadosOrdenados = resultadosPorId.values.toList()
+        ..sort((a, b) => a.nome.compareTo(b.nome));
+
+      if (!mounted) return;
+      setState(() {
+        _resultadosPesquisa = resultadosOrdenados;
+        _isSearching = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _searchError = _mensagemErroBusca(error);
+        _isSearching = false;
+      });
+    }
+  }
+
+  String _mensagemErroBusca(Object error) {
+    if (error is FirebaseException &&
+        error.plugin == 'cloud_firestore' &&
+        error.code == 'permission-denied') {
+      return 'Permissao negada no Firestore. Verifique as regras da colecao remume_santa_maria para permitir leitura.';
+    }
+
+    return 'Nao foi possivel consultar o Firestore: $error';
   }
 
   String _normalizarTexto(String texto) {
@@ -531,7 +694,11 @@ class _HomePageState extends State<HomePage> {
     mapa.forEach((comAcento, semAcento) {
       normalizado = normalizado.replaceAll(comAcento, semAcento);
     });
-    return normalizado;
+
+    normalizado = normalizado.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    return normalizado
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
   }
 
   String _formatarDiasSemana(List<String> dias) {
@@ -554,14 +721,74 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _MedicamentoCatalogo {
+class _MedicamentoCatalogoFirestore {
   final String nome;
-  final String dosePadrao;
-  final String horarioPadrao;
+  final String concentracao;
+  final String formaFarmaceutica;
+  final String componente;
+  final String nomeNormalizado;
+  final String componenteNormalizado;
 
-  const _MedicamentoCatalogo({
+  const _MedicamentoCatalogoFirestore({
     required this.nome,
-    required this.dosePadrao,
-    required this.horarioPadrao,
+    required this.concentracao,
+    required this.formaFarmaceutica,
+    required this.componente,
+    required this.nomeNormalizado,
+    required this.componenteNormalizado,
   });
+
+  factory _MedicamentoCatalogoFirestore.fromFirestore(
+    String id,
+    Map<String, dynamic> data,
+  ) {
+    final nome = (data['nome'] as String? ?? id).trim();
+    final concentracao = (data['concentracao'] as String? ?? '').trim();
+    final formaFarmaceutica = (data['formaFarmaceutica'] as String? ?? '').trim();
+    final componente = (data['componente'] as String? ?? '').trim();
+    final nomeNormalizado = (data['nomeNormalizado'] as String? ?? nome).trim();
+    final componenteNormalizado =
+        (data['componenteNormalizado'] as String? ?? componente).trim();
+
+    return _MedicamentoCatalogoFirestore(
+      nome: nome,
+      concentracao: concentracao.isEmpty ? 'Não informado' : concentracao,
+      formaFarmaceutica:
+          formaFarmaceutica.isEmpty ? 'Não informado' : formaFarmaceutica,
+      componente: componente.isEmpty ? 'Não informado' : componente,
+      nomeNormalizado: nomeNormalizado.isEmpty
+          ? _normalizarTextoFirestore(nome)
+          : nomeNormalizado,
+      componenteNormalizado: componenteNormalizado.isEmpty
+          ? _normalizarTextoFirestore(componente)
+          : componenteNormalizado,
+    );
+  }
+}
+
+String _normalizarTextoFirestore(String texto) {
+  const mapa = {
+    'á': 'a',
+    'à': 'a',
+    'ã': 'a',
+    'â': 'a',
+    'é': 'e',
+    'ê': 'e',
+    'í': 'i',
+    'ó': 'o',
+    'ô': 'o',
+    'õ': 'o',
+    'ú': 'u',
+    'ç': 'c',
+  };
+
+  var normalizado = texto.toLowerCase().trim();
+  mapa.forEach((comAcento, semAcento) {
+    normalizado = normalizado.replaceAll(comAcento, semAcento);
+  });
+
+  normalizado = normalizado.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+  return normalizado
+      .replaceAll(RegExp(r'-+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
 }

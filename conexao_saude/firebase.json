@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"conexao-saude-1ac50","appId":"1:363352659444:android:39b26928af1aac075055a1","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"conexao-saude-1ac50","configurations":{"android":"1:363352659444:android:39b26928af1aac075055a1","ios":"1:363352659444:ios:740748719cefff1a5055a1","macos":"1:363352659444:ios:740748719cefff1a5055a1","web":"1:363352659444:web:f8d8f27477d13d225055a1","windows":"1:363352659444:web:e90c9dfbb41fbdb85055a1"}}}}}}
+{
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "conexao-saude-1ac50",
+					"appId": "1:363352659444:android:39b26928af1aac075055a1",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "conexao-saude-1ac50",
+					"configurations": {
+						"android": "1:363352659444:android:39b26928af1aac075055a1",
+						"ios": "1:363352659444:ios:740748719cefff1a5055a1",
+						"macos": "1:363352659444:ios:740748719cefff1a5055a1",
+						"web": "1:363352659444:web:f8d8f27477d13d225055a1",
+						"windows": "1:363352659444:web:e90c9dfbb41fbdb85055a1"
+					}
+				}
+			}
+		}
+	},
+	"firestore": {
+		"rules": "firestore.rules",
+		"indexes": "firestore.indexes.json"
+	}
+}

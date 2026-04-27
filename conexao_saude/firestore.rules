@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catalogo de medicamentos consultado pelo app.
+    // Permite leitura publica do catalogo no app.
+    match /remume_santa_maria/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Negacao padrao para qualquer outra colecao/documento.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

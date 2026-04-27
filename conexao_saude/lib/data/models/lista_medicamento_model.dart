@@ -12,13 +12,34 @@ class MedicamentoModel extends HiveObject {
   final String horario;
   @HiveField(3)
   final List<String> diasSemana;
+  @HiveField(4)
+  final DateTime dataInicio;
+  @HiveField(5)
+  final DateTime dataFim;
+  @HiveField(6)
+  final int intervaloHoras;
 
   MedicamentoModel({
     required this.nome,
     required this.dose,
     required this.horario,
     required this.diasSemana,
+    required this.dataInicio,
+    required this.dataFim,
+    required this.intervaloHoras,
   });
+
+  /// Retorna o número de dias de duração do tratamento
+  int get duracaoDias => dataFim.difference(dataInicio).inDays + 1;
+
+  /// Verifica se o tratamento está ativo hoje
+  bool get estaAtivoHoje {
+    final agora = DateTime.now();
+    final hojeInicio = DateTime(agora.year, agora.month, agora.day);
+    final hojeFim = DateTime(agora.year, agora.month, agora.day, 23, 59, 59);
+    
+    return dataInicio.isBefore(hojeFim) && dataFim.isAfter(hojeInicio);
+  }
 }
 
 @HiveType(typeId: 1) // ID diferente para a lista

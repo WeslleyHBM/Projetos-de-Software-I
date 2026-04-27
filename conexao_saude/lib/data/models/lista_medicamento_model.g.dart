@@ -20,14 +20,17 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       nome: fields[0] as String,
       dose: fields[1] as String,
       horario: fields[2] as String,
-      diasSemana: (fields[3] as List?)?.cast<String>() ?? const <String>[],
+      diasSemana: (fields[3] as List).cast<String>(),
+      dataInicio: (fields[4] as DateTime?) ?? DateTime.now(),
+      dataFim: (fields[5] as DateTime?) ?? DateTime.now().add(const Duration(days: 30)),
+      intervaloHoras: (fields[6] as int?) ?? 8,
     );
   }
 
   @override
   void write(BinaryWriter writer, MedicamentoModel obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.nome)
       ..writeByte(1)
@@ -35,7 +38,13 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       ..writeByte(2)
       ..write(obj.horario)
       ..writeByte(3)
-      ..write(obj.diasSemana);
+      ..write(obj.diasSemana)
+      ..writeByte(4)
+      ..write(obj.dataInicio)
+      ..writeByte(5)
+      ..write(obj.dataFim)
+      ..writeByte(6)
+      ..write(obj.intervaloHoras);
   }
 
   @override
