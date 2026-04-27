@@ -2,6 +2,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import time
 import csv
 
@@ -11,7 +13,10 @@ options.add_argument("--disable-blink-features=AutomationControlled")
 options.add_argument("--start-maximized")
 
 # Inicializa o Driver
-driver = webdriver.Chrome(options=options)
+driver = webdriver.Chrome(
+    service=Service(ChromeDriverManager().install()),
+    options=options,
+)
 
 # --- DECLARAÇÃO DO WAIT (A biblioteca que estava faltando) ---
 # O '20' é o tempo máximo que ele vai esperar antes de dar erro
