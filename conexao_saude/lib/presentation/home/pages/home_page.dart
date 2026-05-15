@@ -284,17 +284,14 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
+    // Se o usuário clicar em Cancelar ou fechar a janela, só sai da função
     if (confirmado != true) {
-      doseController.dispose();
-      horarioController.dispose();
       return;
     }
 
+    // Pega os textos que o usuário digitou
     final dose = doseController.text.trim();
     final horario = horarioController.text.trim();
-
-    doseController.dispose();
-    horarioController.dispose();
 
     if (dose.isEmpty || horario.isEmpty) {
       if (!mounted) return;

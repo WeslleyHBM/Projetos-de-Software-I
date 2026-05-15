@@ -1,7 +1,7 @@
+import 'package:conexao_saude/presentation/home/pages/main_page.dart';
 import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
 import 'package:conexao_saude/core/theme/app_theme.dart';
 import 'package:conexao_saude/core/services/notification_service.dart';
-import 'package:conexao_saude/presentation/home/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -91,7 +91,7 @@ class ConexaoSaudeApp extends StatelessWidget {
       title: 'Conexao Saude',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const HomePage(),
+      home: const MainPage(), // <--- MUDAMOS AQUI!
     );
   }
 }
