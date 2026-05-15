@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'package:flutter/cupertino.dart';
 import 'package:conexao_saude/core/theme/app_colors.dart';
 import 'package:conexao_saude/core/services/notification_service.dart';
 import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
@@ -72,7 +72,6 @@ class _HomePageState extends State<HomePage> {
     required String nome,
     required String dose,
     required String horario,
-    required List<String> diasSemana,
     required DateTime dataInicio,
     required DateTime dataFim,
     required int intervaloHoras,
@@ -86,8 +85,7 @@ class _HomePageState extends State<HomePage> {
       (item) =>
           item.nome.toLowerCase() == nome.toLowerCase() &&
           item.dose.toLowerCase() == dose.toLowerCase() &&
-          item.horario == horario &&
-          _chavesDiasSemana(item.diasSemana) == _chavesDiasSemana(diasSemana),
+          item.horario == horario
     );
 
     if (jaExiste) {
@@ -102,7 +100,6 @@ class _HomePageState extends State<HomePage> {
       nome: nome,
       dose: dose,
       horario: horario,
-      diasSemana: diasSemana,
       dataInicio: dataInicio,
       dataFim: dataFim,
       intervaloHoras: intervaloHoras,
@@ -124,7 +121,7 @@ class _HomePageState extends State<HomePage> {
       medicamentoNome: nome,
       dose: dose,
       horario: horario,
-      diasSemana: diasSemana,
+      diasSemana: const [],
       dataInicio: dataInicio,
       dataFim: dataFim,
     );
@@ -143,7 +140,7 @@ class _HomePageState extends State<HomePage> {
     final doseController = TextEditingController(
       text: item.concentracao.isNotEmpty ? item.concentracao : '1 comprimido',
     );
-    final horarioController = TextEditingController(text: '08:00');
+    DateTime horarioSelecionado = DateTime(2026, 1, 1, 8, 0);
     DateTime dataInicio = DateTime.now();
     DateTime dataFim = DateTime.now().add(const Duration(days: 30));
     int intervaloHoras = 8;
@@ -165,16 +162,71 @@ class _HomePageState extends State<HomePage> {
                     hintText: 'Ex: 1 comprimido',
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: horarioController,
-                  keyboardType: TextInputType.datetime,
-                  decoration: const InputDecoration(
-                    labelText: 'Horario',
-                    hintText: 'Ex: 08:00',
+                const SizedBox(height: 16),
+                
+                // 2. O novo visual do Seletor de Horário!
+                const Text(
+                  'Horário',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () {
+                    // Quando clica, abre a roleta na parte de baixo da tela
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (BuildContext builder) {
+                        return SizedBox(
+                          height: 250,
+                          child: CupertinoDatePicker(
+                            mode: CupertinoDatePickerMode.time,
+                            use24hFormat: false, // false = Formato 12h (AM/PM)
+                            initialDateTime: horarioSelecionado,
+                            onDateTimeChanged: (DateTime novaHora) {
+                              // Atualiza o desenho do Sol/Lua na mesma hora
+                              setDialogState(() {
+                                horarioSelecionado = novaHora;
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center, // Centraliza os elementos na caixa
+                      children: [
+                        // 1. O Texto agora exibe apenas os números (Hora:Minuto)
+                        Text(
+                          '${(horarioSelecionado.hour % 12 == 0 ? 12 : horarioSelecionado.hour % 12).toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        
+                        const SizedBox(width: 8), // Pequeno espaço entre o número e o ícone
+                        
+                        // 2. O Ícone entra logo após o texto, substituindo visualmente o AM/PM
+                        Icon(
+                          horarioSelecionado.hour >= 6 && horarioSelecionado.hour < 18 
+                              ? Icons.wb_sunny 
+                              : Icons.nightlight_round,
+                          color: horarioSelecionado.hour >= 6 && horarioSelecionado.hour < 18 
+                              ? Colors.orange 
+                              : Colors.blueGrey,
+                          size: 22,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
+                
+                // ... DAQUI PRA BAIXO CONTINUA IGUAL (Data Início, Data Fim, Intervalo) ...
                 const Text(
                   'Data de Início',
                   style: TextStyle(fontWeight: FontWeight.w700),
@@ -182,9 +234,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(_formatarData(dataInicio)),
-                    ),
+                    Expanded(child: Text(_formatarData(dataInicio))),
                     const SizedBox(width: 8),
                     SizedBox(
                       width: 100,
@@ -218,9 +268,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(_formatarData(dataFim)),
-                    ),
+                    Expanded(child: Text(_formatarData(dataFim))),
                     const SizedBox(width: 8),
                     SizedBox(
                       width: 100,
@@ -284,21 +332,17 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
-    // Se o usuário clicar em Cancelar ou fechar a janela, só sai da função
-    if (confirmado != true) {
-      return;
-    }
+    if (confirmado != true) return;
 
-    // Pega os textos que o usuário digitou
     final dose = doseController.text.trim();
-    final horario = horarioController.text.trim();
+    
+    // 3. Pegamos a hora selecionada na roleta e transformamos em texto padrão de novo
+    final String horario = '${horarioSelecionado.hour.toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}';
 
-    if (dose.isEmpty || horario.isEmpty) {
+    if (dose.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha dose e horario para adicionar.'),
-        ),
+        const SnackBar(content: Text('Preencha a dose para adicionar.')),
       );
       return;
     }
@@ -307,7 +351,6 @@ class _HomePageState extends State<HomePage> {
       nome: item.nome,
       dose: dose,
       horario: horario,
-      diasSemana: const [], // Agora sempre vazio, usa intervalo de datas
       dataInicio: dataInicio,
       dataFim: dataFim,
       intervaloHoras: intervaloHoras,
@@ -452,7 +495,7 @@ class _HomePageState extends State<HomePage> {
                     quantidade: item.dose,
                     hora: item.horario,
                     data: dataHoje,
-                    diasSemana: _formatarDiasSemana(item.diasSemana),
+                    diasConsumidos: item.diasConsumidos,
                     duracao: '${item.duracaoDias} dias',
                     dataInicio: _formatarData(item.dataInicio),
                     dataFim: _formatarData(item.dataFim),
@@ -696,18 +739,6 @@ class _HomePageState extends State<HomePage> {
     return normalizado
         .replaceAll(RegExp(r'-+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
-  }
-
-  String _formatarDiasSemana(List<String> dias) {
-    if (dias.isEmpty) {
-      return 'Dias nao definidos';
-    }
-    return dias.join(', ');
-  }
-
-  String _chavesDiasSemana(List<String> dias) {
-    final ordenado = List<String>.from(dias)..sort();
-    return ordenado.join('|');
   }
 
   String _formatarData(DateTime date) {

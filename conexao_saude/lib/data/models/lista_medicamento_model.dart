@@ -10,8 +10,8 @@ class MedicamentoModel extends HiveObject {
   final String dose;
   @HiveField(2)
   final String horario;
-  @HiveField(3)
-  final List<String> diasSemana;
+  @HiveField(3, defaultValue: 0)
+  int diasConsumidos;
   @HiveField(4)
   final DateTime dataInicio;
   @HiveField(5)
@@ -23,7 +23,7 @@ class MedicamentoModel extends HiveObject {
     required this.nome,
     required this.dose,
     required this.horario,
-    required this.diasSemana,
+    this.diasConsumidos = 0,
     required this.dataInicio,
     required this.dataFim,
     required this.intervaloHoras,

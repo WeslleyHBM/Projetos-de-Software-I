@@ -6,7 +6,7 @@ class MedicamentoItemCard extends StatelessWidget {
   final String quantidade;
   final String hora;
   final String data;
-  final String? diasSemana;
+  final int diasConsumidos;
   final String? imageUrl;
   final String? duracao;
   final String? dataInicio;
@@ -18,7 +18,7 @@ class MedicamentoItemCard extends StatelessWidget {
     required this.quantidade,
     required this.hora,
     required this.data,
-    this.diasSemana,
+    required this.diasConsumidos,
     this.imageUrl,
     this.duracao,
     this.dataInicio,
@@ -64,14 +64,26 @@ class MedicamentoItemCard extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _InfoChip(
-                      icon: Icons.medication_outlined,
-                      label: 'Qtd: $quantidade',
+                    _InfoChip(icon: Icons.medication_outlined, label: 'Qtd: $quantidade'),
+                    Builder(
+                      builder: (context) {
+                        // Extrai a hora (ex: "19:28" vira o número 19)
+                        final int hour = int.tryParse(hora.split(':').first) ?? 0;
+                        final bool isDay = hour >= 6 && hour < 18;
+                        
+                        return _InfoChip(
+                          icon: isDay ? Icons.wb_sunny : Icons.nightlight_round,
+                          iconColor: isDay ? Colors.orange : Colors.blueGrey,
+                          label: hora,
+                        );
+                      }
                     ),
-                    _InfoChip(icon: Icons.access_time, label: hora),
-                    _InfoChip(icon: Icons.calendar_month, label: data),
-                    if (diasSemana != null && diasSemana!.trim().isNotEmpty)
-                      _InfoChip(icon: Icons.event_repeat, label: diasSemana!),
+                    
+                    _InfoChip(icon: Icons.calendar_month, label: data), 
+                    
+                    
+                    _InfoChip(icon: Icons.check_circle_outline, label: 'Consumidos: $diasConsumidos'),
+                    
                     if (duracao != null && duracao!.trim().isNotEmpty)
                       _InfoChip(icon: Icons.schedule, label: 'Dur.: $duracao'),
                     if (dataInicio != null && dataInicio!.trim().isNotEmpty)
@@ -121,8 +133,13 @@ class MedicamentoItemCard extends StatelessWidget {
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color? iconColor;
 
-  const _InfoChip({required this.icon, required this.label});
+  const _InfoChip({
+    required this.icon, 
+    required this.label, 
+    this.iconColor, // <-- ADICIONADO AO CONSTRUTOR
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +152,7 @@ class _InfoChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.textSecondary),
+          Icon(icon, size: 14, color: iconColor ?? AppColors.textSecondary),
           const SizedBox(width: 4),
           Text(
             label,

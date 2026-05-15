@@ -71,7 +71,7 @@ Future<void> _reagendarNotificacoes() async {
           medicamentoNome: medicamento.nome,
           dose: medicamento.dose,
           horario: medicamento.horario,
-          diasSemana: medicamento.diasSemana,
+          diasSemana: const [],
           dataInicio: medicamento.dataInicio,
           dataFim: medicamento.dataFim,
         );

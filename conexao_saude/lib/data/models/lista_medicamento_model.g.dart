@@ -20,10 +20,10 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       nome: fields[0] as String,
       dose: fields[1] as String,
       horario: fields[2] as String,
-      diasSemana: (fields[3] as List).cast<String>(),
-      dataInicio: (fields[4] as DateTime?) ?? DateTime.now(),
-      dataFim: (fields[5] as DateTime?) ?? DateTime.now().add(const Duration(days: 30)),
-      intervaloHoras: (fields[6] as int?) ?? 8,
+      diasConsumidos: fields[3] == null ? 0 : fields[3] as int,
+      dataInicio: fields[4] as DateTime,
+      dataFim: fields[5] as DateTime,
+      intervaloHoras: fields[6] as int,
     );
   }
 
@@ -38,7 +38,7 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       ..writeByte(2)
       ..write(obj.horario)
       ..writeByte(3)
-      ..write(obj.diasSemana)
+      ..write(obj.diasConsumidos)
       ..writeByte(4)
       ..write(obj.dataInicio)
       ..writeByte(5)
