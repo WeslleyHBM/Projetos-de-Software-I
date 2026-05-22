@@ -23,6 +23,58 @@ class _MainPageState extends State<MainPage> {
     const EstatisticasPage(),
   ];
 
+  void _pedirSenhaAdmin(BuildContext context) {
+    final senhaController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Acesso Restrito'),
+          content: TextField(
+            controller: senhaController,
+            obscureText: true, // Esconde a senha com bolinhas
+            decoration: const InputDecoration(
+              labelText: 'Senha do Médico',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.lock),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (senhaController.text == 'medico') {
+                  Navigator.pop(dialogContext); // Fecha o pop-up
+                  // Vai para a tela de Admin
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminPage(), 
+                    ),
+                  );
+                } else {
+                  Navigator.pop(dialogContext); // Fecha o pop-up
+                  // Mostra o erro
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('senha errada'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Entrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,13 +93,8 @@ class _MainPageState extends State<MainPage> {
                 child: IconButton(
                   icon: const Icon(Icons.settings, size: 30, color: Colors.white),
                   onPressed: () {
-                    // Ao invés de trocar a aba, abrimos a tela do médico por cima
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminPage(), // <-- Mude para MedicoPage() se esse for o nome da sua classe
-                      ),
-                    );
+                    // Agora ele pede a senha antes de abrir a página!
+                    _pedirSenhaAdmin(context);
                   },
                 ),
               ),

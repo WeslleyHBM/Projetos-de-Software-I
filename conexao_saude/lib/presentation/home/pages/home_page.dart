@@ -1,12 +1,8 @@
-import 'dart:async';
-import 'package:flutter/cupertino.dart';
-import 'package:conexao_saude/core/theme/app_colors.dart';
-import 'package:conexao_saude/core/services/notification_service.dart';
-import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
-import 'package:conexao_saude/presentation/home/widgets/medicamento_item_card.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:conexao_saude/core/theme/app_colors.dart';
+import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
+import 'package:conexao_saude/presentation/home/widgets/medicamento_item_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,343 +13,142 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const String _listaHomeKey = 'lista_home_inicial';
-  static const String _colecaoRemume = 'remume_santa_maria';
 
   final TextEditingController _searchController = TextEditingController();
-  Timer? _searchDebounce;
   String _searchTerm = '';
-  List<MedicamentoModel> _medicamentosSalvos = [];
-  List<_MedicamentoCatalogoFirestore> _resultadosPesquisa = [];
-  bool _isLoading = true;
-  bool _isSearching = false;
-  String? _searchError;
-  final _notificationService = NotificationService();
 
   Box<ListaMedicamentoModel> get _listasBox =>
       Hive.box<ListaMedicamentoModel>('minhas_listas');
 
   @override
-  void initState() {
-    super.initState();
-    _carregarMedicamentosSalvos();
-  }
-
-  @override
   void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _carregarMedicamentosSalvos() async {
-    final lista = _listasBox.get(_listaHomeKey);
-
-    if (lista == null) {
-      await _listasBox.put(
-        _listaHomeKey,
-        ListaMedicamentoModel(titulo: 'Lista inicial', medicamentos: const []),
-      );
-      if (!mounted) return;
-      setState(() {
-        _medicamentosSalvos = [];
-        _isLoading = false;
-      });
-      return;
-    }
-
-    if (!mounted) return;
+  // Atualiza a variável de texto sempre que o paciente digita algo
+  void _onSearchChanged(String value) {
     setState(() {
-      _medicamentosSalvos = List<MedicamentoModel>.from(lista.medicamentos);
-      _isLoading = false;
+      _searchTerm = value.trim().toLowerCase();
     });
   }
 
-  Future<void> _adicionarMedicamentoNoHive({
-    required String nome,
-    required String dose,
-    required String horario,
-    required DateTime dataInicio,
-    required DateTime dataFim,
-    required int intervaloHoras,
-  }) async {
-    final listaAtual = _listasBox.get(_listaHomeKey);
-    final medicamentos = listaAtual == null
-        ? <MedicamentoModel>[]
-        : List<MedicamentoModel>.from(listaAtual.medicamentos);
-
-    final jaExiste = medicamentos.any(
-      (item) =>
-          item.nome.toLowerCase() == nome.toLowerCase() &&
-          item.dose.toLowerCase() == dose.toLowerCase() &&
-          item.horario == horario
-    );
-
-    if (jaExiste) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Esse remedio ja foi adicionado.')),
-      );
-      return;
-    }
-
-    final novoMedicamento = MedicamentoModel(
-      nome: nome,
-      dose: dose,
-      horario: horario,
-      dataInicio: dataInicio,
-      dataFim: dataFim,
-      intervaloHoras: intervaloHoras,
-    );
-
-    medicamentos.add(novoMedicamento);
-
-    await _listasBox.put(
-      _listaHomeKey,
-      ListaMedicamentoModel(
-        titulo: 'Lista inicial',
-        medicamentos: medicamentos,
-      ),
-    );
-
-    // Agenda as notificações
-    await _notificationService.agendarNotificacoesRecorrentes(
-      medicamentoId: medicamentos.indexOf(novoMedicamento),
-      medicamentoNome: nome,
-      dose: dose,
-      horario: horario,
-      diasSemana: const [],
-      dataInicio: dataInicio,
-      dataFim: dataFim,
-    );
-
-    if (!mounted) return;
-    setState(() {
-      _medicamentosSalvos = medicamentos;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$nome adicionado na sua lista inicial.')),
-    );
+  void _onSearch() {
+    FocusScope.of(context).unfocus();
   }
 
-  Future<void> _abrirDialogoAdicionar(_MedicamentoCatalogoFirestore item) async {
-    final doseController = TextEditingController(
-      text: item.concentracao.isNotEmpty ? item.concentracao : '1 comprimido',
-    );
-    DateTime horarioSelecionado = DateTime(2026, 1, 1, 8, 0);
-    DateTime dataInicio = DateTime.now();
-    DateTime dataFim = DateTime.now().add(const Duration(days: 30));
-    int intervaloHoras = 8;
+  String _formatarData(DateTime date) {
+    final dia = date.day.toString().padLeft(2, '0');
+    final mes = date.month.toString().padLeft(2, '0');
+    final ano = date.year.toString();
+    return '$dia/$mes/$ano';
+  }
 
-    final confirmado = await showDialog<bool>(
+  void _abrirDialogoTomarRemedio(MedicamentoModel item) {
+    showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Adicionar ${item.nome}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: doseController,
-                  decoration: const InputDecoration(
-                    labelText: 'Dose',
-                    hintText: 'Ex: 1 comprimido',
-                  ),
-                ),
-                const SizedBox(height: 16),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final agora = DateTime.now();
+            bool podeClicar = false;
+            String mensagemStatus = '';
+            Color corStatus = Colors.grey;
+
+            if (item.ultimaDose == null) {
+              final partesHora = item.horario.split(':');
+              final horarioInicial = DateTime(
+                item.dataInicio.year, item.dataInicio.month, item.dataInicio.day,
+                int.parse(partesHora[0]), int.parse(partesHora[1])
+              );
+              
+              final minutosParaInicio = horarioInicial.difference(agora).inMinutes;
+
+              if (minutosParaInicio > 15) {
+                podeClicar = false;
+                mensagemStatus = 'Muito cedo! Faltam $minutosParaInicio minutos para a primeira dose.';
+                corStatus = Colors.orange;
+              } else {
+                podeClicar = true;
+                mensagemStatus = 'Pronto para tomar a primeira dose!';
+                corStatus = Colors.green;
+              }
+            } else {
+              final proximaDose = item.ultimaDose!.add(Duration(hours: item.intervaloHoras));
+              final minutosParaProxima = proximaDose.difference(agora).inMinutes;
+
+              if (minutosParaProxima > 15) {
+                podeClicar = false;
+                final horas = minutosParaProxima ~/ 60;
+                final minutos = minutosParaProxima % 60;
+                final tempoRestante = horas > 0 ? '${horas}h e ${minutos}min' : '${minutos}min';
                 
-                // 2. O novo visual do Seletor de Horário!
-                const Text(
-                  'Horário',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () {
-                    // Quando clica, abre a roleta na parte de baixo da tela
-                    showModalBottomSheet(
-                      context: context,
-                      builder: (BuildContext builder) {
-                        return SizedBox(
-                          height: 250,
-                          child: CupertinoDatePicker(
-                            mode: CupertinoDatePickerMode.time,
-                            use24hFormat: false, // false = Formato 12h (AM/PM)
-                            initialDateTime: horarioSelecionado,
-                            onDateTimeChanged: (DateTime novaHora) {
-                              // Atualiza o desenho do Sol/Lua na mesma hora
-                              setDialogState(() {
-                                horarioSelecionado = novaHora;
-                              });
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                mensagemStatus = 'Aguarde o intervalo. Faltam $tempoRestante.';
+                corStatus = Colors.orange;
+              } else {
+                podeClicar = true;
+                mensagemStatus = 'Pronto para tomar!';
+                corStatus = Colors.green;
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(item.nome, textAlign: TextAlign.center),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 180,
+                    width: double.infinity,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400),
-                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.green.shade200, width: 2),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center, // Centraliza os elementos na caixa
-                      children: [
-                        // 1. O Texto agora exibe apenas os números (Hora:Minuto)
-                        Text(
-                          '${(horarioSelecionado.hour % 12 == 0 ? 12 : horarioSelecionado.hour % 12).toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        
-                        const SizedBox(width: 8), // Pequeno espaço entre o número e o ícone
-                        
-                        // 2. O Ícone entra logo após o texto, substituindo visualmente o AM/PM
-                        Icon(
-                          horarioSelecionado.hour >= 6 && horarioSelecionado.hour < 18 
-                              ? Icons.wb_sunny 
-                              : Icons.nightlight_round,
-                          color: horarioSelecionado.hour >= 6 && horarioSelecionado.hour < 18 
-                              ? Colors.orange 
-                              : Colors.blueGrey,
-                          size: 22,
-                        ),
-                      ],
+                    child: const Center(
+                      child: Icon(Icons.medication, size: 80, color: Colors.green),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Text('Dose: ${item.dose}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  Text(mensagemStatus, textAlign: TextAlign.center, style: TextStyle(color: corStatus, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Voltar', style: TextStyle(color: Colors.grey)),
                 ),
-                const SizedBox(height: 16),
-                
-                // ... DAQUI PRA BAIXO CONTINUA IGUAL (Data Início, Data Fim, Intervalo) ...
-                const Text(
-                  'Data de Início',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: Text(_formatarData(dataInicio))),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 100,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final data = await showDatePicker(
-                            context: context,
-                            initialDate: dataInicio,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (data != null) {
-                            setDialogState(() {
-                              dataInicio = data;
-                              if (dataFim.isBefore(dataInicio)) {
-                                dataFim = dataInicio.add(const Duration(days: 30));
-                              }
-                            });
-                          }
-                        },
-                        child: const Text('Alterar'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Data de Término',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: Text(_formatarData(dataFim))),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 100,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final data = await showDatePicker(
-                            context: context,
-                            initialDate: dataFim,
-                            firstDate: dataInicio,
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (data != null) {
-                            setDialogState(() {
-                              dataFim = data;
-                            });
-                          }
-                        },
-                        child: const Text('Alterar'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Intervalo entre doses (horas)',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                DropdownButton<int>(
-                  value: intervaloHoras,
-                  isExpanded: true,
-                  items: [4, 6, 8, 12, 24]
-                      .map((valor) => DropdownMenuItem(
-                            value: valor,
-                            child: Text('$valor horas'),
-                          ))
-                      .toList(),
-                  onChanged: (valor) {
-                    setDialogState(() {
-                      intervaloHoras = valor ?? 8;
-                    });
-                  },
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check),
+                  label: const Text('Tomar Remédio'),
+                  onPressed: podeClicar ? () {
+                    Navigator.of(dialogContext).pop();
+                    
+                    // Como estamos usando o ValueListenableBuilder, basta salvar no item
+                    // que a tela toda vai se atualizar sozinha!
+                    item.diasConsumidos += 1;
+                    item.ultimaDose = DateTime.now();
+                    item.save(); 
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Dose de ${item.nome} registada com sucesso!'), backgroundColor: Colors.green),
+                    );
+                  } : null, 
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
                 ),
               ],
-            ),
-          ),
-          actionsAlignment: MainAxisAlignment.start,
-          actionsOverflowAlignment: OverflowBarAlignment.start,
-          actionsOverflowButtonSpacing: 8,
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Adicionar'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (confirmado != true) return;
-
-    final dose = doseController.text.trim();
-    
-    // 3. Pegamos a hora selecionada na roleta e transformamos em texto padrão de novo
-    final String horario = '${horarioSelecionado.hour.toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}';
-
-    if (dose.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha a dose para adicionar.')),
-      );
-      return;
-    }
-
-    await _adicionarMedicamentoNoHive(
-      nome: item.nome,
-      dose: dose,
-      horario: horario,
-      dataInicio: dataInicio,
-      dataFim: dataFim,
-      intervaloHoras: intervaloHoras,
+            );
+          }
+        );
+      }
     );
   }
 
@@ -390,7 +185,7 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Text(
-                  'Pesquisa de Remedios',
+                  'Meus Medicamentos',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
@@ -407,29 +202,11 @@ class _HomePageState extends State<HomePage> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
-                    hintText: 'Digite o nome do remedio',
+                    hintText: 'Pesquise na sua lista...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _onSearch,
-                    icon: const Icon(Icons.search, size: 18),
-                    label: const Text('Buscar'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(120, 50),
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                     ),
                   ),
                 ),
@@ -456,367 +233,86 @@ class _HomePageState extends State<HomePage> {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 860),
-          child: ListView(
-            children: [
-              const Text(
-                'Meus Remedios',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${_medicamentosSalvos.length} item(ns) salvo(s)',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else if (_medicamentosSalvos.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Voce ainda nao adicionou remedios na lista inicial.',
+          // --- A MÁGICA DE ESCUTAR O BANCO DE DADOS EM TEMPO REAL ---
+          child: ValueListenableBuilder<Box<ListaMedicamentoModel>>(
+            valueListenable: _listasBox.listenable(),
+            builder: (context, box, _) {
+              final lista = box.get(_listaHomeKey);
+              final medicamentosSalvos = lista == null
+                  ? <MedicamentoModel>[]
+                  : List<MedicamentoModel>.from(lista.medicamentos);
+
+              // Filtra os remédios do paciente baseado na barra de pesquisa
+              final medicamentosFiltrados = medicamentosSalvos.where((item) {
+                return item.nome.toLowerCase().contains(_searchTerm);
+              }).toList();
+
+              return ListView(
+                children: [
+                  const Text(
+                    'Rotina Diária',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                   ),
-                )
-              else
-                ..._medicamentosSalvos.map(
-                  (item) => MedicamentoItemCard(
-                    nome: item.nome,
-                    quantidade: item.dose,
-                    hora: item.horario,
-                    data: dataHoje,
-                    diasConsumidos: item.diasConsumidos,
-                    duracao: '${item.duracaoDias} dias',
-                    dataInicio: _formatarData(item.dataInicio),
-                    dataFim: _formatarData(item.dataFim),
-                    imageUrl: null,
+                  const SizedBox(height: 8),
+                  Text(
+                    '${medicamentosFiltrados.length} item(ns) encontrado(s)',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
-                ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-              const Text(
-                'Resultado da Pesquisa',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              if (_searchTerm.isEmpty)
-                const Text(
-                  'Digite e busque um remedio para ver resultados.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary),
-                )
-              else if (_isSearching)
-                const Center(child: CircularProgressIndicator())
-              else if (_searchError != null)
-                Text(
-                  _searchError!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.redAccent),
-                )
-              else if (_resultadosPesquisa.isEmpty)
-                Text(
-                  'Nenhum remedio encontrado para "$_searchTerm".',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary),
-                )
-              else
-                ..._resultadosPesquisa.map(
-                  (item) => Container(
-                    margin: const EdgeInsets.only(top: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.14),
+                  const SizedBox(height: 16),
+                  
+                  if (medicamentosSalvos.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
                       ),
+                      child: const Text(
+                        'Ainda não tem medicamentos registados. O seu médico irá adicioná-los no painel.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    )
+                  else if (medicamentosFiltrados.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: const Text(
+                        'Nenhum medicamento encontrado com esse nome na sua lista.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    )
+                  else
+                    ...medicamentosFiltrados.map(
+                      (item) {
+                        // Calcula a duração em dias para exibir no card
+                        final int duracaoDias = item.dataFim.difference(item.dataInicio).inDays;
+                        
+                        return MedicamentoItemCard(
+                          nome: item.nome,
+                          quantidade: item.dose,
+                          hora: item.horario,
+                          data: dataHoje,
+                          diasConsumidos: item.diasConsumidos,
+                          duracao: '$duracaoDias dias',
+                          dataInicio: _formatarData(item.dataInicio),
+                          dataFim: _formatarData(item.dataFim),
+                          imageUrl: null,
+                          onTap: () {
+                            _abrirDialogoTomarRemedio(item);
+                          }
+                        );
+                      }
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.medication_outlined,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.nome,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Concentração: ${item.concentracao} | Forma: ${item.formaFarmaceutica}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Componente: ${item.componente}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 110,
-                          child: ElevatedButton(
-                            onPressed: () => _abrirDialogoAdicionar(item),
-                            child: const Icon(Icons.add),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
   }
-
-  void _onSearch() {
-    FocusScope.of(context).unfocus();
-    _buscarMedicamentosFirestore();
-  }
-
-  void _onSearchChanged(String value) {
-    final termo = value.trim();
-
-    setState(() {
-      _searchTerm = termo;
-    });
-
-    _searchDebounce?.cancel();
-
-    if (termo.isEmpty) {
-      setState(() {
-        _resultadosPesquisa = [];
-        _searchError = null;
-        _isSearching = false;
-      });
-      return;
-    }
-
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      _buscarMedicamentosFirestore();
-    });
-  }
-
-  Future<void> _buscarMedicamentosFirestore() async {
-    final termo = _searchController.text.trim();
-
-    if (termo.isEmpty) {
-      setState(() {
-        _searchTerm = '';
-        _resultadosPesquisa = [];
-        _searchError = null;
-        _isSearching = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _searchTerm = termo;
-      _isSearching = true;
-      _searchError = null;
-      _resultadosPesquisa = [];
-    });
-
-    try {
-      final termoNormalizado = _normalizarTexto(termo);
-      final collection = FirebaseFirestore.instance.collection(_colecaoRemume);
-
-      final consultas = await Future.wait([
-        collection
-            .orderBy('nomeNormalizado')
-            .startAt([termoNormalizado])
-            .endAt(['$termoNormalizado\uf8ff'])
-            .get(),
-        collection
-            .orderBy('componenteNormalizado')
-            .startAt([termoNormalizado])
-            .endAt(['$termoNormalizado\uf8ff'])
-            .get(),
-      ]);
-
-      final resultadosPorId = <String, _MedicamentoCatalogoFirestore>{};
-
-      for (final snapshot in consultas) {
-        for (final doc in snapshot.docs) {
-          final item = _MedicamentoCatalogoFirestore.fromFirestore(doc.id, doc.data());
-          resultadosPorId[doc.id] = item;
-        }
-      }
-
-      if (resultadosPorId.isEmpty) {
-        final fallbackSnapshot = await collection.get();
-        for (final doc in fallbackSnapshot.docs) {
-          final item = _MedicamentoCatalogoFirestore.fromFirestore(doc.id, doc.data());
-          final nomeNormalizado = _normalizarTexto(item.nome);
-          final componenteNormalizado = _normalizarTexto(item.componente);
-          if (nomeNormalizado.contains(termoNormalizado) ||
-              componenteNormalizado.contains(termoNormalizado)) {
-            resultadosPorId[doc.id] = item;
-          }
-        }
-      }
-
-      final resultadosOrdenados = resultadosPorId.values.toList()
-        ..sort((a, b) => a.nome.compareTo(b.nome));
-
-      if (!mounted) return;
-      setState(() {
-        _resultadosPesquisa = resultadosOrdenados;
-        _isSearching = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _searchError = _mensagemErroBusca(error);
-        _isSearching = false;
-      });
-    }
-  }
-
-  String _mensagemErroBusca(Object error) {
-    if (error is FirebaseException &&
-        error.plugin == 'cloud_firestore' &&
-        error.code == 'permission-denied') {
-      return 'Permissao negada no Firestore. Verifique as regras da colecao remume_santa_maria para permitir leitura.';
-    }
-
-    return 'Nao foi possivel consultar o Firestore: $error';
-  }
-
-  String _normalizarTexto(String texto) {
-    const mapa = {
-      'á': 'a',
-      'à': 'a',
-      'ã': 'a',
-      'â': 'a',
-      'é': 'e',
-      'ê': 'e',
-      'í': 'i',
-      'ó': 'o',
-      'ô': 'o',
-      'õ': 'o',
-      'ú': 'u',
-      'ç': 'c',
-    };
-
-    var normalizado = texto.toLowerCase().trim();
-    mapa.forEach((comAcento, semAcento) {
-      normalizado = normalizado.replaceAll(comAcento, semAcento);
-    });
-
-    normalizado = normalizado.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
-    return normalizado
-        .replaceAll(RegExp(r'-+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-  }
-
-  String _formatarData(DateTime date) {
-    final dia = date.day.toString().padLeft(2, '0');
-    final mes = date.month.toString().padLeft(2, '0');
-    final ano = date.year.toString();
-    return '$dia/$mes/$ano';
-  }
-}
-
-class _MedicamentoCatalogoFirestore {
-  final String nome;
-  final String concentracao;
-  final String formaFarmaceutica;
-  final String componente;
-  final String nomeNormalizado;
-  final String componenteNormalizado;
-
-  const _MedicamentoCatalogoFirestore({
-    required this.nome,
-    required this.concentracao,
-    required this.formaFarmaceutica,
-    required this.componente,
-    required this.nomeNormalizado,
-    required this.componenteNormalizado,
-  });
-
-  factory _MedicamentoCatalogoFirestore.fromFirestore(
-    String id,
-    Map<String, dynamic> data,
-  ) {
-    final nome = (data['nome'] as String? ?? id).trim();
-    final concentracao = (data['concentracao'] as String? ?? '').trim();
-    final formaFarmaceutica = (data['formaFarmaceutica'] as String? ?? '').trim();
-    final componente = (data['componente'] as String? ?? '').trim();
-    final nomeNormalizado = (data['nomeNormalizado'] as String? ?? nome).trim();
-    final componenteNormalizado =
-        (data['componenteNormalizado'] as String? ?? componente).trim();
-
-    return _MedicamentoCatalogoFirestore(
-      nome: nome,
-      concentracao: concentracao.isEmpty ? 'Não informado' : concentracao,
-      formaFarmaceutica:
-          formaFarmaceutica.isEmpty ? 'Não informado' : formaFarmaceutica,
-      componente: componente.isEmpty ? 'Não informado' : componente,
-      nomeNormalizado: nomeNormalizado.isEmpty
-          ? _normalizarTextoFirestore(nome)
-          : nomeNormalizado,
-      componenteNormalizado: componenteNormalizado.isEmpty
-          ? _normalizarTextoFirestore(componente)
-          : componenteNormalizado,
-    );
-  }
-}
-
-String _normalizarTextoFirestore(String texto) {
-  const mapa = {
-    'á': 'a',
-    'à': 'a',
-    'ã': 'a',
-    'â': 'a',
-    'é': 'e',
-    'ê': 'e',
-    'í': 'i',
-    'ó': 'o',
-    'ô': 'o',
-    'õ': 'o',
-    'ú': 'u',
-    'ç': 'c',
-  };
-
-  var normalizado = texto.toLowerCase().trim();
-  mapa.forEach((comAcento, semAcento) {
-    normalizado = normalizado.replaceAll(comAcento, semAcento);
-  });
-
-  normalizado = normalizado.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
-  return normalizado
-      .replaceAll(RegExp(r'-+'), '-')
-      .replaceAll(RegExp(r'^-+|-+$'), '');
 }
