@@ -1,9 +1,9 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:conexao_saude/core/theme/app_colors.dart';
 import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
 import 'package:conexao_saude/presentation/home/widgets/medicamento_item_card.dart';
-import 'package:conexao_saude/presentation/home/pages/edita_banco_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -38,93 +38,389 @@ class _HomePageState extends State<HomePage> {
     FocusScope.of(context).unfocus();
   }
 
-  void _abrirPaginaEditarRemedio(MedicamentoModel medicamento, int indice) async {
-    final resultado = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EditaRemediaPage(
-          medicamento: medicamento,
-          indice: indice,
+  String _formatarData(DateTime data) {
+    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+  }
+
+  Future<void> _abrirDialogoEditar(MedicamentoModel item, int indice) async {
+    // Pede a senha do médico primeiro
+    final senhaCorreta = await _pedirSenhaDoMedico();
+    if (!senhaCorreta) return;
+
+    final doseController = TextEditingController(text: item.dose);
+    DateTime horarioSelecionado = _parseHorario(item.horario);
+    DateTime dataInicio = item.dataInicio;
+    DateTime dataFim = item.dataFim;
+    int intervaloHoras = item.intervaloHoras;
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Editar ${item.nome}'),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: doseController,
+                    decoration: const InputDecoration(
+                      labelText: 'Dose',
+                      hintText: 'Ex: 1 comprimido',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Horário',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (BuildContext builder) {
+                          return SizedBox(
+                            height: 250,
+                            child: CupertinoDatePicker(
+                              mode: CupertinoDatePickerMode.time,
+                              use24hFormat: false,
+                              initialDateTime: horarioSelecionado,
+                              onDateTimeChanged: (DateTime novaHora) {
+                                setDialogState(() {
+                                  horarioSelecionado = novaHora;
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${(horarioSelecionado.hour % 12 == 0 ? 12 : horarioSelecionado.hour % 12).toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            horarioSelecionado.hour < 12
+                                ? Icons.wb_sunny
+                                : Icons.nightlight_round,
+                            color: horarioSelecionado.hour < 12
+                                ? Colors.orange
+                                : Colors.blueGrey,
+                            size: 22,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Data de Início',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: Text(_formatarData(dataInicio))),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 100,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = await showDatePicker(
+                              context: context,
+                              initialDate: dataInicio,
+                              firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (data != null) {
+                              setDialogState(() {
+                                dataInicio = data;
+                                if (dataFim.isBefore(dataInicio)) {
+                                  dataFim = dataInicio.add(const Duration(days: 30));
+                                }
+                              });
+                            }
+                          },
+                          child: const Text('Alterar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Data de Término',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: Text(_formatarData(dataFim))),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 100,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = await showDatePicker(
+                              context: context,
+                              initialDate: dataFim,
+                              firstDate: dataInicio,
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (data != null) {
+                              setDialogState(() {
+                                dataFim = data;
+                              });
+                            }
+                          },
+                          child: const Text('Alterar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Intervalo entre doses (horas)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButton<int>(
+                    value: intervaloHoras,
+                    isExpanded: true,
+                    items: [4, 6, 8, 12, 24]
+                        .map((valor) => DropdownMenuItem(
+                              value: valor,
+                              child: Text('$valor horas'),
+                            ))
+                        .toList(),
+                    onChanged: (valor) {
+                      setDialogState(() {
+                        intervaloHoras = valor ?? 8;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.start,
+          actionsOverflowAlignment: OverflowBarAlignment.start,
+          actionsOverflowButtonSpacing: 8,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Salvar'),
+            ),
+          ],
         ),
       ),
     );
 
-    if (resultado == true && mounted) {
+    if (confirmado != true) return;
+
+    final dose = doseController.text.trim();
+
+    if (dose.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Medicamento atualizado com sucesso!'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Preencha a dose para editar.')),
       );
+      return;
     }
+
+    // Obter a lista atual
+    final listaAtual = _listasBox.get(_listaHomeKey);
+    if (listaAtual == null) return;
+
+    final medicamentos = List<MedicamentoModel>.from(listaAtual.medicamentos);
+    
+    // Encontrar o índice do medicamento
+    final indiceMedicamento = medicamentos.indexWhere(
+      (med) =>
+          med.nome == item.nome &&
+          med.dose == item.dose &&
+          med.horario == item.horario,
+    );
+
+    if (indiceMedicamento == -1) return;
+
+    // Criar um novo medicamento com os dados atualizados
+    final novoMedicamento = MedicamentoModel(
+      nome: item.nome,
+      dose: dose,
+      horario: '${horarioSelecionado.hour.toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
+      dataInicio: dataInicio,
+      dataFim: dataFim,
+      intervaloHoras: intervaloHoras,
+      diasConsumidos: item.diasConsumidos,
+      ultimaDose: item.ultimaDose,
+    );
+
+    // Remover o antigo e adicionar o novo
+    medicamentos[indiceMedicamento] = novoMedicamento;
+
+    // Salvar a lista atualizada
+    await _listasBox.put(
+      _listaHomeKey,
+      ListaMedicamentoModel(
+        titulo: 'Lista inicial',
+        medicamentos: medicamentos,
+      ),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Medicamento atualizado com sucesso!'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
-  void _confirmarDeletarRemedio(MedicamentoModel medicamento, int indice) {
-    showDialog(
+  DateTime _parseHorario(String horario) {
+    final partes = horario.split(':');
+    final horas = int.parse(partes[0]);
+    final minutos = int.parse(partes[1]);
+    return DateTime(2026, 1, 1, horas, minutos);
+  }
+
+  Future<bool> _pedirSenhaDoMedico() async {
+    final senhaController = TextEditingController();
+    final resultado = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Acesso Restrito'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Para editar ou remover medicamentos, é necessário a senha do médico.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: senhaController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Senha do Médico',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (senhaController.text == 'medico') {
+                  Navigator.pop(dialogContext, true);
+                } else {
+                  Navigator.pop(dialogContext, false);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Senha incorreta! Acesso negado.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text('Entrar', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    return resultado ?? false;
+  }
+
+  Future<void> _removerMedicamento(MedicamentoModel item) async {
+    // Pede a senha do médico primeiro
+    final senhaCorreta = await _pedirSenhaDoMedico();
+    if (!senhaCorreta) return;
+
+    final confirmado = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Deletar Medicamento'),
-        content: Text(
-          'Tem certeza que deseja deletar "${medicamento.nome}"? Esta ação não pode ser desfeita.',
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
+        title: const Text('Remover Medicamento'),
+        content: Text('Deseja remover "${item.nome}" da sua lista?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
           ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.delete),
-            label: const Text('Deletar'),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              _deletarRemedio(medicamento, indice);
-            },
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
             ),
+            child: const Text('Remover', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
-  }
 
-  void _deletarRemedio(MedicamentoModel medicamento, int indice) {
-    try {
-      final lista = _listasBox.get(_listaHomeKey);
-      if (lista != null && indice >= 0 && indice < lista.medicamentos.length) {
-        lista.medicamentos.removeAt(indice);
-        lista.save();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${medicamento.nome} deletado com sucesso!'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao deletar medicamento: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+    if (confirmado != true) return;
 
-  String _formatarData(DateTime date) {
-    final dia = date.day.toString().padLeft(2, '0');
-    final mes = date.month.toString().padLeft(2, '0');
-    final ano = date.year.toString();
-    return '$dia/$mes/$ano';
+    // Obter a lista atual
+    final listaAtual = _listasBox.get(_listaHomeKey);
+    if (listaAtual == null) return;
+
+    final medicamentos = List<MedicamentoModel>.from(listaAtual.medicamentos);
+    
+    // Encontrar e remover o medicamento
+    medicamentos.removeWhere(
+      (med) =>
+          med.nome == item.nome &&
+          med.dose == item.dose &&
+          med.horario == item.horario,
+    );
+
+    // Salvar a lista atualizada
+    await _listasBox.put(
+      _listaHomeKey,
+      ListaMedicamentoModel(
+        titulo: 'Lista inicial',
+        medicamentos: medicamentos,
+      ),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item.nome} foi removido da sua lista.'),
+        backgroundColor: Colors.orange,
+      ),
+    );
   }
 
   void _abrirDialogoTomarRemedio(MedicamentoModel item) {
@@ -371,7 +667,6 @@ class _HomePageState extends State<HomePage> {
                   else
                     ...medicamentosFiltrados.asMap().entries.map(
                       (entry) {
-                        final int indiceReal = medicamentosSalvos.indexOf(entry.value);
                         final item = entry.value;
                         // Calcula a duração em dias para exibir no card
                         final int duracaoDias = item.dataFim.difference(item.dataInicio).inDays;
@@ -390,10 +685,10 @@ class _HomePageState extends State<HomePage> {
                             _abrirDialogoTomarRemedio(item);
                           },
                           onEdit: () {
-                            _abrirPaginaEditarRemedio(item, indiceReal);
+                            _abrirDialogoEditar(item, entry.key);
                           },
                           onDelete: () {
-                            _confirmarDeletarRemedio(item, indiceReal);
+                            _removerMedicamento(item);
                           },
                         );
                       }
