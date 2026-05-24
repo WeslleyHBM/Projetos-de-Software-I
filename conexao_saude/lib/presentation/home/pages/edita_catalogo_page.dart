@@ -13,6 +13,35 @@ class EditaCatalogoPage extends StatefulWidget {
 
 class _EditaCatalogoPageState extends State<EditaCatalogoPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  TextEditingController? _searchControllerInstance;
+  String _searchQuery = '';
+  late Future<bool> _authFuture;
+
+  TextEditingController get _searchController {
+    _searchControllerInstance ??= TextEditingController();
+    return _searchControllerInstance!;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _authFuture = _waitForAuth();
+  }
+
+  @override
+  void dispose() {
+    _searchControllerInstance?.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSearch(MedicamentoFirestoreModel medicamento) {
+    if (_searchQuery.isEmpty) return true;
+    
+    return medicamento.nome.toLowerCase().contains(_searchQuery) ||
+        medicamento.concentracao.toLowerCase().contains(_searchQuery) ||
+        medicamento.formula.toLowerCase().contains(_searchQuery) ||
+        medicamento.componenteBasico.toLowerCase().contains(_searchQuery);
+  }
 
   Future<void> _abrirPaginaEditar(
     MedicamentoFirestoreModel medicamento,
@@ -129,7 +158,7 @@ class _EditaCatalogoPageState extends State<EditaCatalogoPage> {
         elevation: 0,
       ),
       body: FutureBuilder<bool>(
-        future: _waitForAuth(),
+        future: _authFuture,
         builder: (context, authSnapshot) {
           // Aguardando autenticação
           if (authSnapshot.connectionState == ConnectionState.waiting) {
@@ -155,8 +184,47 @@ class _EditaCatalogoPageState extends State<EditaCatalogoPage> {
 
           return Stack(
             children: [
-              // StreamBuilder para carregar medicamentos da coleção compartilhada
-              StreamBuilder<QuerySnapshot>(
+              // Coluna principal com busca e lista
+              Column(
+                children: [
+                  // Campo de pesquisa
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _searchController,
+                      textInputAction: TextInputAction.none,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toLowerCase();
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Pesquisar por nome, concentração, fórmula ou componente...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // StreamBuilder para carregar medicamentos da coleção compartilhada
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
                 stream: _firestore
                     .collection('remume_santa_maria')
                     .snapshots(),
@@ -231,11 +299,40 @@ class _EditaCatalogoPageState extends State<EditaCatalogoPage> {
                     );
                   }).toList();
 
+                  // Filtrar medicamentos baseado na pesquisa
+                  final medicamentosFiltrados =
+                      medicamentos.where(_matchesSearch).toList();
+
+                  // Se há medicamentos na lista mas nenhum corresponde à pesquisa
+                  if (medicamentosFiltrados.isEmpty && medicamentos.isNotEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Nenhum medicamento encontrado para "$_searchQuery"',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: medicamentos.length,
+                    itemCount: medicamentosFiltrados.length,
                     itemBuilder: (context, index) {
-                      final medicamento = medicamentos[index];
+                      final medicamento = medicamentosFiltrados[index];
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -305,6 +402,9 @@ class _EditaCatalogoPageState extends State<EditaCatalogoPage> {
                     },
                   );
                 },
+              ),
+                  ),
+                ],
               ),
               
               // Aviso visual se auth não funcionou (banner no topo)
