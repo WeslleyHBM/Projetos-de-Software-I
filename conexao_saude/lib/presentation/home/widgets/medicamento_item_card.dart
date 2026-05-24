@@ -12,6 +12,8 @@ class MedicamentoItemCard extends StatelessWidget {
   final String? dataInicio;
   final String? dataFim;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const MedicamentoItemCard({
     super.key,
@@ -25,6 +27,8 @@ class MedicamentoItemCard extends StatelessWidget {
     this.duracao,
     this.dataInicio,
     this.dataFim,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -103,6 +107,43 @@ class MedicamentoItemCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              // Botões de ação
+              if (onEdit != null || onDelete != null)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit' && onEdit != null) {
+                      onEdit!();
+                    } else if (value == 'delete' && onDelete != null) {
+                      onDelete!();
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    if (onEdit != null)
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text('Editar'),
+                          ],
+                        ),
+                      ),
+                    if (onDelete != null)
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Deletar'),
+                          ],
+                        ),
+                      ),
+                  ],
+                  icon: const Icon(Icons.more_vert),
+                ),
             ],
           ),
         ),

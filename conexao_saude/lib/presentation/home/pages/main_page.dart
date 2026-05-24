@@ -61,7 +61,7 @@ class _MainPageState extends State<MainPage> {
                   // Mostra o erro
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('senha errada'),
+                      content: Text('Senha incorreta! Acesso negado.'),
                       backgroundColor: Colors.red,
                     ),
                   );

@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:conexao_saude/core/theme/app_colors.dart';
 import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
 import 'package:conexao_saude/presentation/home/widgets/medicamento_item_card.dart';
+import 'package:conexao_saude/presentation/home/pages/edita_banco_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,6 +36,88 @@ class _HomePageState extends State<HomePage> {
 
   void _onSearch() {
     FocusScope.of(context).unfocus();
+  }
+
+  void _abrirPaginaEditarRemedio(MedicamentoModel medicamento, int indice) async {
+    final resultado = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditaRemediaPage(
+          medicamento: medicamento,
+          indice: indice,
+        ),
+      ),
+    );
+
+    if (resultado == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Medicamento atualizado com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _confirmarDeletarRemedio(MedicamentoModel medicamento, int indice) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Deletar Medicamento'),
+        content: Text(
+          'Tem certeza que deseja deletar "${medicamento.nome}"? Esta ação não pode ser desfeita.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.delete),
+            label: const Text('Deletar'),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _deletarRemedio(medicamento, indice);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deletarRemedio(MedicamentoModel medicamento, int indice) {
+    try {
+      final lista = _listasBox.get(_listaHomeKey);
+      if (lista != null && indice >= 0 && indice < lista.medicamentos.length) {
+        lista.medicamentos.removeAt(indice);
+        lista.save();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${medicamento.nome} deletado com sucesso!'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao deletar medicamento: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _formatarData(DateTime date) {
@@ -286,8 +369,10 @@ class _HomePageState extends State<HomePage> {
                       ),
                     )
                   else
-                    ...medicamentosFiltrados.map(
-                      (item) {
+                    ...medicamentosFiltrados.asMap().entries.map(
+                      (entry) {
+                        final int indiceReal = medicamentosSalvos.indexOf(entry.value);
+                        final item = entry.value;
                         // Calcula a duração em dias para exibir no card
                         final int duracaoDias = item.dataFim.difference(item.dataInicio).inDays;
                         
@@ -303,7 +388,13 @@ class _HomePageState extends State<HomePage> {
                           imageUrl: null,
                           onTap: () {
                             _abrirDialogoTomarRemedio(item);
-                          }
+                          },
+                          onEdit: () {
+                            _abrirPaginaEditarRemedio(item, indiceReal);
+                          },
+                          onDelete: () {
+                            _confirmarDeletarRemedio(item, indiceReal);
+                          },
                         );
                       }
                     ),

@@ -4,6 +4,7 @@ import 'package:conexao_saude/core/theme/app_theme.dart';
 import 'package:conexao_saude/core/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase_options.dart';
@@ -13,6 +14,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await _initializeFirebaseSafely();
+
+  // Autentica o usuário anonimamente para acessar o Firestore
+  await _autenticarAnonimamente();
 
   // Inicializa o hive pra armazenamento local de dados no Zorin OS
   await Hive.initFlutter();
@@ -48,6 +52,31 @@ Future<void> _initializeFirebaseSafely() async {
     );
   } on UnsupportedError catch (error) {
     debugPrint('Firebase nao configurado para esta plataforma: $error');
+  }
+}
+
+Future<void> _autenticarAnonimamente() async {
+  try {
+    final auth = FirebaseAuth.instance;
+    
+    // Verifica se já há um usuário autenticado
+    if (auth.currentUser == null) {
+      // Se não há, tenta fazer autenticação anônima (com retry)
+      try {
+        await auth.signInAnonymously();
+        debugPrint('✓ Autenticação anônima realizada com sucesso');
+      } on FirebaseAuthException catch (authError) {
+        debugPrint('⚠️ Erro na autenticação anônima: ${authError.code} - ${authError.message}');
+        // Em web, a auth pode estar desabilitada - isso é esperado
+        if (authError.code == 'configuration-not-found') {
+          debugPrint('ℹ️ Auth anônima não configurada para esta plataforma (pode ser web)');
+        }
+      }
+    } else {
+      debugPrint('✓ Usuário já autenticado: ${auth.currentUser?.uid}');
+    }
+  } catch (e) {
+    debugPrint('❌ Erro ao autenticar anonimamente: $e');
   }
 }
 

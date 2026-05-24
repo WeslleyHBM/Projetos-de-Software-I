@@ -4,10 +4,18 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:conexao_saude/presentation/home/pages/adicona_remedio_list_page.dart'; // Ajuste o caminho se necessário
-import 'package:conexao_saude/data/models/lista_medicamento_model.dart'; 
+import 'package:conexao_saude/data/models/lista_medicamento_model.dart';
+import 'package:conexao_saude/presentation/home/pages/cria_remedio_firestore_page.dart';
+import 'package:conexao_saude/presentation/home/pages/edita_catalogo_page.dart'; 
 
-class AdminPage extends StatelessWidget {
+class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
+
+  @override
+  State<AdminPage> createState() => _AdminPageState();
+}
+
+class _AdminPageState extends State<AdminPage> {
 
   // --- FUNÇÃO MÁGICA QUE GERA E ABRE O PDF PARA DOWNLOAD ---
   Future<void> _gerarEBaixarPDF(BuildContext context) async {
@@ -143,8 +151,24 @@ class AdminPage extends StatelessWidget {
                 subtitulo: 'Cadastrar um remédio novo no banco de dados.',
                 icone: Icons.add_box,
                 cor: Colors.green,
-                onTap: () {
-                  print('Clicou em Novo Medicamento');
+                onTap: () async {
+                  final resultado = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const CriaRemediaFirestorePage(),
+                    ),
+                  );
+
+                  if (resultado == true && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Medicamento adicionado ao catálogo com sucesso!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 16),
@@ -152,11 +176,16 @@ class AdminPage extends StatelessWidget {
               // CARD 3: Editar Banco de Dados
               _AdminActionCard(
                 titulo: 'Editar Catálogo',
-                subtitulo: 'Mudar nome, dose e adicionar foto aos remédios.',
+                subtitulo: 'Mudar nome, dose e descrição dos remédios.',
                 icone: Icons.edit_document,
                 cor: Colors.orange,
                 onTap: () {
-                  print('Clicou em Editar Catálogo');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EditaCatalogoPage(),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 16),
