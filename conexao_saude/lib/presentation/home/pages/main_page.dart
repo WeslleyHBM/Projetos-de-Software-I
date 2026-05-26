@@ -4,7 +4,6 @@ import 'package:conexao_saude/presentation/home/pages/home_page.dart';
 import 'package:conexao_saude/presentation/home/pages/estatisticas_page.dart';
 import 'package:conexao_saude/presentation/home/pages/admin_page.dart';
 
-
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -78,28 +77,29 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Usamos um Stack (Pilha) para colocar a engrenagem por cima de tudo
       body: Stack(
         children: [
           // 1º Camada: A página atual (Início ou Estatísticas)
           _paginas[_indiceAtual],
           
           // 2º Camada: O botão da engrenagem flutuando na esquerda
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topLeft, // Posiciona no topo esquerdo
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8.0, top: 8.0),
-                child: IconButton(
-                  icon: const Icon(Icons.settings, size: 30, color: Colors.white),
-                  onPressed: () {
-                    // Agora ele pede a senha antes de abrir a página!
-                    _pedirSenhaAdmin(context);
-                  },
+          // O "if" garante que a engrenagem SÓ aparece na aba 0 (Início)
+          if (_indiceAtual == 0)
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft, // Posiciona no topo esquerdo
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+                  child: IconButton(
+                    icon: const Icon(Icons.settings, size: 30, color: Colors.white),
+                    onPressed: () {
+                      // Agora ele pede a senha antes de abrir a página!
+                      _pedirSenhaAdmin(context);
+                    },
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
       
@@ -119,8 +119,8 @@ class _MainPageState extends State<MainPage> {
             label: 'Início',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'Estatísticas',
+            icon: Icon(Icons.local_fire_department),
+            label: 'Ofensivas',
           ),
         ],
       ),

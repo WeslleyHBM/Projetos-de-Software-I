@@ -24,13 +24,16 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       dataInicio: fields[4] as DateTime,
       dataFim: fields[5] as DateTime,
       intervaloHoras: fields[6] as int,
+      ultimaDose: fields[7] as DateTime?,
+      ofensivaAtual: fields[8] == null ? 0 : fields[8] as int,
+      maiorOfensiva: fields[9] == null ? 0 : fields[9] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, MedicamentoModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.nome)
       ..writeByte(1)
@@ -44,7 +47,13 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       ..writeByte(5)
       ..write(obj.dataFim)
       ..writeByte(6)
-      ..write(obj.intervaloHoras);
+      ..write(obj.intervaloHoras)
+      ..writeByte(7)
+      ..write(obj.ultimaDose)
+      ..writeByte(8)
+      ..write(obj.ofensivaAtual)
+      ..writeByte(9)
+      ..write(obj.maiorOfensiva);
   }
 
   @override

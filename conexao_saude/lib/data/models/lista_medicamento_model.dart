@@ -20,7 +20,10 @@ class MedicamentoModel extends HiveObject {
   final int intervaloHoras;
   @HiveField(7)
   DateTime? ultimaDose;
-
+  @HiveField(8, defaultValue: 0)
+  int ofensivaAtual;
+  @HiveField(9, defaultValue: 0)
+  int maiorOfensiva;
 
   MedicamentoModel({
     required this.nome,
@@ -31,6 +34,8 @@ class MedicamentoModel extends HiveObject {
     required this.dataFim,
     required this.intervaloHoras,
     this.ultimaDose,
+    this.ofensivaAtual = 0,
+    this.maiorOfensiva = 0,
   });
 
   /// Retorna o número de dias de duração do tratamento
