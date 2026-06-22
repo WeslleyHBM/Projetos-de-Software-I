@@ -90,22 +90,30 @@ Future<void> _reagendarNotificacoes() async {
     if (lista == null) return;
 
     // Reagenda notificações para cada medicamento ativo
-    for (int index = 0; index < lista.medicamentos.length; index++) {
-      final medicamento = lista.medicamentos[index];
-      
-      // Verifica se o tratamento ainda está ativo
-      if (medicamento.estaAtivoHoje) {
-        await notificationService.agendarNotificacoesRecorrentes(
-          medicamentoId: index,
-          medicamentoNome: medicamento.nome,
-          dose: medicamento.dose,
-          horario: medicamento.horario,
-          diasSemana: const [],
-          dataInicio: medicamento.dataInicio,
-          dataFim: medicamento.dataFim,
-        );
-      }
-    }
+    // Reagenda notificações para todos os medicamentos da lista
+        for (int index = 0; index < lista.medicamentos.length; index++) {
+          final medicamento = lista.medicamentos[index];
+          
+          // 1. Juntamos a data e a hora inicial para o alarme saber o ponto de partida
+          final partesHora = medicamento.horario.split(':');
+          final dataHoraExataInicio = DateTime(
+            medicamento.dataInicio.year,
+            medicamento.dataInicio.month,
+            medicamento.dataInicio.day,
+            int.parse(partesHora[0]),
+            int.parse(partesHora[1]),
+          );
+
+          // 2. Chamamos a nova função que calcula os intervalos automaticamente
+          await notificationService.agendarNotificacoesPorIntervalo(
+            medicamentoId: index,
+            medicamentoNome: medicamento.nome,
+            dose: medicamento.dose,
+            dataInicio: dataHoraExataInicio,
+            intervaloHoras: medicamento.intervaloHoras,
+            dataFim: medicamento.dataFim,
+          );
+        }
   } catch (e) {
     debugPrint('Erro ao reagendar notificações: $e');
   }

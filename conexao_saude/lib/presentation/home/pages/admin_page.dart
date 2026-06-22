@@ -26,86 +26,155 @@ class _AdminPageState extends State<AdminPage> {
     final listaAtual = box.get('lista_home_inicial');
     
     if (listaAtual == null || listaAtual.medicamentos.isEmpty) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('O paciente não possui medicamentos na lista para exportar.')),
       );
       return;
     }
 
-    // Desenha o visual do PDF
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Padding(
-            padding: const pw.EdgeInsets.all(24),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Center(
-                  child: pw.Text('Conexão Saúde - Receita Digital', 
-                      style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Center(
-                  child: pw.Text('Lista de Medicamentos e Orientações de Consumo', 
-                      style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)), // Retirado o const
-                ),
-                pw.Divider(thickness: 2),
-                pw.SizedBox(height: 20),
-
-                // Lista os remédios um embaixo do outro no PDF
-                pw.ListView.builder(
-                  itemCount: listaAtual.medicamentos.length,
-                  itemBuilder: (pw.Context context, int index) {
-                    final item = listaAtual.medicamentos[index];
-                    return pw.Container(
-                      margin: const pw.EdgeInsets.only(bottom: 16),
-                      padding: const pw.EdgeInsets.all(12),
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: PdfColors.grey400, width: 1),
-                        borderRadius: pw.BorderRadius.circular(8),
-                      ),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(item.nome, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                          pw.SizedBox(height: 4),
-                          pw.Row(
-                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, // CORRIGIDO AQUI!
-                            children: [
-                              pw.Text('Dose: ${item.dose}', style: pw.TextStyle(fontSize: 14)), // Retirado o const
-                              pw.Text('Intervalo: De ${item.intervaloHoras} em ${item.intervaloHoras} horas', 
-                                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                            ],
-                          ),
-                          pw.SizedBox(height: 4),
-                          pw.Text(
-                            'Horário da primeira dose: ${item.horario}',
-                            style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600) // Retirado o const
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                pw.Spacer(),
-                pw.Divider(),
-                pw.Center(
-                  child: pw.Text('Documento gerado eletronicamente pelo Painel do Médico.', 
-                      style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)), // CORRIGIDO AQUI!
-                ),
-              ],
-            ),
+        margin: const pw.EdgeInsets.all(24),
+        header: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(
+                child: pw.Text('Conexão Saúde - Receita Digital', 
+                    style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Center(
+                child: pw.Text('Checklist de Consumo de Medicamentos', 
+                    style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+              ),
+              pw.Divider(thickness: 2),
+              pw.SizedBox(height: 20),
+            ]
           );
+        },
+        footer: (pw.Context context) {
+          return pw.Column(
+            children: [
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text(
+                  'Documento gerado eletronicamente pelo Painel do Médico. Página ${context.pageNumber} de ${context.pagesCount}', 
+                  style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic),
+                ),
+              ),
+            ]
+          );
+        },
+        build: (pw.Context context) {
+          // =================================================================
+          // A MÁGICA ACONTECE AQUI: Uma lista plana e "solta" de widgets!
+          // Isso impede que o PDF trave ao tentar cortar a página.
+          // =================================================================
+          final List<pw.Widget> elementosPDF = []; 
+
+          for (var item in listaAtual.medicamentos) {
+            final partesHora = item.horario.split(':');
+            final int horaBase = int.tryParse(partesHora[0]) ?? 0;
+            final int minutoBase = int.tryParse(partesHora[1]) ?? 0;
+
+            DateTime doseAtual = DateTime(
+              item.dataInicio.year,
+              item.dataInicio.month,
+              item.dataInicio.day,
+              horaBase,
+              minutoBase,
+            );
+
+            final int intervalo = item.intervaloHoras > 0 ? item.intervaloHoras : 8;
+            List<DateTime> todasAsDoses = [];
+            
+            int limiteDoses = 0;
+            // Aumentei o limite de segurança para suportar tratamentos longos
+            while (doseAtual.isBefore(item.dataFim) && limiteDoses < 200) {
+              todasAsDoses.add(doseAtual);
+              doseAtual = doseAtual.add(Duration(hours: intervalo));
+              limiteDoses++;
+            }
+
+            // 1. Título do Remédio
+            elementosPDF.add(
+              pw.Text(
+                item.nome.toUpperCase(), 
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)
+              )
+            );
+            elementosPDF.add(pw.SizedBox(height: 4));
+            
+            // 2. Dose e Intervalo
+            elementosPDF.add(
+              pw.Text(
+                'Dose: ${item.dose}   |   De ${intervalo} em ${intervalo} horas', 
+                style: pw.TextStyle(fontSize: 14, color: PdfColors.grey800)
+              )
+            );
+            elementosPDF.add(pw.SizedBox(height: 16));
+
+            // 3. Linhas da Grelha de Quadradinhos
+            const int numeroDeColunas = 3; 
+
+            for (int i = 0; i < todasAsDoses.length; i += numeroDeColunas) {
+              final chunk = todasAsDoses.sublist(
+                i, 
+                i + numeroDeColunas > todasAsDoses.length ? todasAsDoses.length : i + numeroDeColunas
+              );
+              
+              elementosPDF.add(
+                pw.Row(
+                  children: List.generate(numeroDeColunas, (index) {
+                    if (index < chunk.length) {
+                      final dose = chunk[index];
+                      final horaStr = dose.hour.toString().padLeft(2, '0');
+                      final minStr = dose.minute.toString().padLeft(2, '0');
+                      final diaStr = dose.day.toString().padLeft(2, '0');
+                      final mesStr = dose.month.toString().padLeft(2, '0');
+                      
+                      return pw.Expanded(
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
+                          children: [
+                            pw.Container(
+                              width: 14, 
+                              height: 14, 
+                              decoration: pw.BoxDecoration(
+                                border: pw.Border.all(color: PdfColors.black, width: 1.2),
+                              )
+                            ),
+                            pw.SizedBox(width: 8),
+                            pw.Text('$horaStr:$minStr  $diaStr/$mesStr', style: const pw.TextStyle(fontSize: 13)),
+                          ]
+                        )
+                      );
+                    } else {
+                      return pw.Expanded(child: pw.SizedBox());
+                    }
+                  })
+                )
+              );
+              elementosPDF.add(pw.SizedBox(height: 12)); 
+            }
+            
+            // 4. Espaçamento e Linha divisória antes do próximo remédio
+            elementosPDF.add(pw.SizedBox(height: 8));
+            elementosPDF.add(pw.Divider(color: PdfColors.grey400, thickness: 1));
+            elementosPDF.add(pw.SizedBox(height: 24)); 
+          }
+
+          return elementosPDF;
         },
       ),
     );
 
-    // Abre a tela nativa do telemóvel
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Receita_Medicamentos_Paciente.pdf',
+      name: 'Receita_Checklist_Paciente.pdf',
     );
   }
 

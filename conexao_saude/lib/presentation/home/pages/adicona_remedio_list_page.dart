@@ -83,14 +83,27 @@ class _AdicionaRemedioListPageState extends State<AdicionaRemedioListPage> {
       ),
     );
 
-    // Agenda as notificações (Lógica limpa sem o bug dos diasSemana)
-    await _notificationService.agendarNotificacoesRecorrentes(
-      medicamentoId: medicamentos.indexOf(novoMedicamento),
+    // =======================================================================
+    // NOVO SISTEMA DE NOTIFICAÇÃO: Armado e pronto para disparar!
+    // =======================================================================
+    // 1. Precisamos juntar a Data (Ex: 26/05/2026) com a Hora (Ex: 08:00) 
+    // para o alarme saber o momento exato de começar a contar os intervalos.
+    final partesHora = horario.split(':');
+    final dataHoraExataInicio = DateTime(
+      dataInicio.year,
+      dataInicio.month,
+      dataInicio.day,
+      int.parse(partesHora[0]),
+      int.parse(partesHora[1]),
+    );
+
+    // 2. Chama o novo serviço blindado
+    await _notificationService.agendarNotificacoesPorIntervalo(
+      medicamentoId: medicamentos.indexOf(novoMedicamento), // ID único
       medicamentoNome: nome,
       dose: dose,
-      horario: horario,
-      diasSemana: const [],
-      dataInicio: dataInicio,
+      dataInicio: dataHoraExataInicio,
+      intervaloHoras: intervaloHoras,
       dataFim: dataFim,
     );
 

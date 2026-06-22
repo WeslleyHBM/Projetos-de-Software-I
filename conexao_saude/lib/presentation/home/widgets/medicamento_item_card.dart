@@ -81,7 +81,7 @@ class MedicamentoItemCard extends StatelessWidget {
                             final int hour = int.tryParse(hora.split(':').first) ?? 0;
                             
                             // AM é menor que 12. PM é 12 ou maior.
-                            final bool isAM = hour < 12; 
+                            final bool isAM = hour >= 6 && hour < 18;  
                             
                             return _InfoChip(
                               icon: isAM ? Icons.wb_sunny : Icons.nightlight_round,

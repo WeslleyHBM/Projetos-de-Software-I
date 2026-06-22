@@ -156,31 +156,23 @@ class _HomePageState extends State<HomePage> {
                         final medAntigo = medicamentos[index];
                         final instanteAtual = DateTime.now();
 
-                        // --- LÓGICA DO DUOLINGO (OFENSIVA) ---
                         int novaOfensiva = medAntigo.ofensivaAtual;
                         int novoRecorde = medAntigo.maiorOfensiva;
 
                         if (medAntigo.ultimaDose != null) {
-                          // Calcula horas desde a última vez que ele apertou o botão
                           final horasDesdeUltima = instanteAtual.difference(medAntigo.ultimaDose!).inHours;
-                          
-                          // Se ele atrasou mais do que o (intervalo + 6 horas de tolerância), quebra a ofensiva!
                           if (horasDesdeUltima > (medAntigo.intervaloHoras + 6)) {
                             novaOfensiva = 1; 
                           } else {
-                            // Se ele tomou certinho, e hoje é um dia diferente do último clique, ganha +1 dia!
                             if (instanteAtual.day != medAntigo.ultimaDose!.day) {
                               novaOfensiva += 1;
                             }
                           }
                         } else {
-                          // Primeira vez que está tomando o remédio na vida
                           novaOfensiva = 1;
                         }
 
-                        // Atualiza o recorde se a ofensiva atual superou ele
                         if (novaOfensiva > novoRecorde) novoRecorde = novaOfensiva;
-                        // -------------------------------------
 
                         medicamentos[index] = MedicamentoModel(
                           nome: medAntigo.nome,
@@ -191,8 +183,8 @@ class _HomePageState extends State<HomePage> {
                           intervaloHoras: medAntigo.intervaloHoras,
                           diasConsumidos: medAntigo.diasConsumidos + 1,
                           ultimaDose: instanteAtual,
-                          ofensivaAtual: novaOfensiva,   // Salva a ofensiva
-                          maiorOfensiva: novoRecorde,    // Salva o recorde
+                          ofensivaAtual: novaOfensiva,   
+                          maiorOfensiva: novoRecorde,    
                         );
 
                         await _listasBox.put(_listaHomeKey, ListaMedicamentoModel(titulo: lista.titulo, medicamentos: medicamentos));
@@ -257,7 +249,11 @@ class _HomePageState extends State<HomePage> {
     DateTime horarioSelecionado = _parseHorario(item.horario);
     DateTime dataInicio = item.dataInicio;
     DateTime dataFim = item.dataFim;
-    int intervaloHoras = item.intervaloHoras;
+    
+    final valoresPermitidos = [4, 6, 8, 12, 24];
+    int intervaloHoras = valoresPermitidos.contains(item.intervaloHoras) 
+        ? item.intervaloHoras 
+        : 8;
 
     final confirmado = await showDialog<bool>(
       context: context,
@@ -362,8 +358,8 @@ class _HomePageState extends State<HomePage> {
       horario: '${horarioSelecionado.hour.toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
       dataInicio: dataInicio, dataFim: dataFim, intervaloHoras: intervaloHoras,
       diasConsumidos: item.diasConsumidos, ultimaDose: item.ultimaDose,
-      ofensivaAtual: item.ofensivaAtual, // <-- Não reseta ao editar
-      maiorOfensiva: item.maiorOfensiva, // <-- Não reseta ao editar
+      ofensivaAtual: item.ofensivaAtual, 
+      maiorOfensiva: item.maiorOfensiva, 
     );
 
     await _listasBox.put(_listaHomeKey, ListaMedicamentoModel(titulo: 'Lista inicial', medicamentos: medicamentos));
@@ -474,7 +470,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 16),
                   
                   if (medicamentosSalvos.isEmpty)
-                    Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.primary.withValues(alpha: 0.14))), child: const Text('Ainda não tem medicamentos registados.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)))
+                    Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.primary.withValues(alpha: 0.14))), child: const Text('Ainda não tem medicamentos registados. O seu médico irá adicioná-los no painel.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)))
                   else if (medicamentosFiltrados.isEmpty)
                     Container(padding: const EdgeInsets.all(16), child: const Text('Nenhum medicamento encontrado.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)))
                   else
