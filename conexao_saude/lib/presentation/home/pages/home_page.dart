@@ -258,22 +258,24 @@ class _HomePageState extends State<HomePage> {
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Editar ${item.nome}'),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9,
-            child: SingleChildScrollView(
+        builder: (dialogCtx, setDialogState) => Dialog(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
               child: Column(
-                mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('Editar ${item.nome}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
                   TextField(controller: doseController, decoration: const InputDecoration(labelText: 'Dose')),
                   const SizedBox(height: 16),
                   const Text('Horário Base', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  InkWell(
+                  GestureDetector(
                     onTap: () {
                       showModalBottomSheet(
-                        context: context,
+                        context: dialogCtx,
                         builder: (BuildContext builder) {
                           return SizedBox(height: 250, child: CupertinoDatePicker(mode: CupertinoDatePickerMode.time, use24hFormat: false, initialDateTime: horarioSelecionado, onDateTimeChanged: (DateTime novaHora) { setDialogState(() { horarioSelecionado = novaHora; }); }));
                         },
@@ -298,12 +300,16 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       Expanded(child: Text(_formatarData(dataInicio))),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final data = await showDatePicker(context: context, initialDate: dataInicio, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 365)));
-                          if (data != null) { setDialogState(() { dataInicio = data; if (dataFim.isBefore(dataInicio)) dataFim = dataInicio.add(const Duration(days: 30)); }); }
-                        },
-                        child: const Text('Alterar'),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = await showDatePicker(context: dialogCtx, initialDate: dataInicio, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 365)));
+                            if (data != null) { setDialogState(() { dataInicio = data; if (dataFim.isBefore(dataInicio)) dataFim = dataInicio.add(const Duration(days: 30)); }); }
+                          },
+                          child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Alterar')),
+                        ),
                       ),
                     ],
                   ),
@@ -313,38 +319,61 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       Expanded(child: Text(_formatarData(dataFim))),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final data = await showDatePicker(context: context, initialDate: dataFim, firstDate: dataInicio, lastDate: DateTime.now().add(const Duration(days: 365)));
-                          if (data != null) setDialogState(() { dataFim = data; });
-                        },
-                        child: const Text('Alterar'),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = await showDatePicker(context: dialogCtx, initialDate: dataFim, firstDate: dataInicio, lastDate: DateTime.now().add(const Duration(days: 365)));
+                            if (data != null) setDialogState(() { dataFim = data; });
+                          },
+                          child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Alterar')),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   const Text('Intervalo (horas)', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  DropdownButton<int>(
-                    value: intervaloHoras, isExpanded: true,
-                    items: [4, 6, 8, 12, 24].map((valor) => DropdownMenuItem(value: valor, child: Text('$valor horas'))).toList(),
-                    onChanged: (valor) { setDialogState(() { intervaloHoras = valor ?? 8; }); },
+                  SizedBox(
+                    width: double.infinity,
+                    child: DropdownButton<int>(
+                      value: intervaloHoras, isExpanded: true,
+                      items: [4, 6, 8, 12, 24].map((valor) => DropdownMenuItem(value: valor, child: Text('$valor horas'))).toList(),
+                      onChanged: (valor) { setDialogState(() { intervaloHoras = valor ?? 8; }); },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        width: 90,
+                        child: TextButton(onPressed: () => Navigator.of(dialogCtx).pop(false), child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Cancelar'))),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(onPressed: () => Navigator.of(dialogCtx).pop(true), child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Salvar'))),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancelar')),
-            ElevatedButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Salvar')),
-          ],
         ),
       ),
     );
 
     if (confirmado != true) return;
+    
     final dose = doseController.text.trim();
-    if (dose.isEmpty) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha a dose.'))); return; }
+    if (dose.isEmpty) { 
+      if (!mounted) return; 
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha a dose.'))); 
+      return; 
+    }
 
     final listaAtual = _listasBox.get(_listaHomeKey);
     if (listaAtual == null) return;
@@ -354,10 +383,14 @@ class _HomePageState extends State<HomePage> {
     if (indiceMedicamento == -1) return;
 
     medicamentos[indiceMedicamento] = MedicamentoModel(
-      nome: item.nome, dose: dose,
+      nome: item.nome, 
+      dose: dose,
       horario: '${horarioSelecionado.hour.toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
-      dataInicio: dataInicio, dataFim: dataFim, intervaloHoras: intervaloHoras,
-      diasConsumidos: item.diasConsumidos, ultimaDose: item.ultimaDose,
+      dataInicio: dataInicio, 
+      dataFim: dataFim, 
+      intervaloHoras: intervaloHoras,
+      diasConsumidos: item.diasConsumidos, 
+      ultimaDose: item.ultimaDose,
       ofensivaAtual: item.ofensivaAtual, 
       maiorOfensiva: item.maiorOfensiva, 
     );
