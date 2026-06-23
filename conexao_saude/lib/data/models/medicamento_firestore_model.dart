@@ -1,12 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class MedicamentoFirestoreModel {
-  final String id; // ID do Firestore
+  final String id;
   final String nome;
   final String concentracao;
   final String formula;
   final String componenteBasico;
-  final String? fotoUrl;
   final DateTime dataCriacao;
   final DateTime dataAtualizacao;
+  final List<String> imageUrls; // AGORA É UMA LISTA!
 
   MedicamentoFirestoreModel({
     required this.id,
@@ -14,58 +16,68 @@ class MedicamentoFirestoreModel {
     required this.concentracao,
     required this.formula,
     required this.componenteBasico,
-    this.fotoUrl,
     required this.dataCriacao,
     required this.dataAtualizacao,
+    this.imageUrls = const [],
   });
 
-  // Converter para Map para salvar no Firestore
   Map<String, dynamic> toMap() {
     return {
       'nome': nome,
       'concentracao': concentracao,
-      'formaFarmaceutica': formula,
-      'componente': componenteBasico,
-      'fotoUrl': fotoUrl,
-      'dataCriacao': dataCriacao,
+      'formula': formula,
+      'componenteBasico': componenteBasico,
+      'dataCriacao': dataCriacao, // O Firebase converte automaticamente para Timestamp
       'dataAtualizacao': dataAtualizacao,
+      'imageUrls': imageUrls, 
     };
   }
 
-  // Converter de Map do Firestore
-  factory MedicamentoFirestoreModel.fromMap(String id, Map<String, dynamic> data) {
+  factory MedicamentoFirestoreModel.fromMap(String id, Map<String, dynamic> map) {
+    // ESTA É A MÁGICA QUE RESOLVE O ERRO VERMELHO DO TIMESTAMP:
+    DateTime parseDate(dynamic dateData) {
+      if (dateData is Timestamp) return dateData.toDate();
+      if (dateData is String) return DateTime.tryParse(dateData) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    // Preparado para a lista nova, mas aceita a imagem velha se existir
+    List<String> urls = [];
+    if (map['imageUrls'] != null) {
+      urls = List<String>.from(map['imageUrls']);
+    } else if (map['imageUrl'] != null) {
+      urls = [map['imageUrl'] as String];
+    }
+
     return MedicamentoFirestoreModel(
       id: id,
-      nome: data['nome'] ?? '',
-      concentracao: data['concentracao'] ?? '',
-      formula: data['formaFarmaceutica'] ?? '',
-      componenteBasico: data['componente'] ?? '',
-      fotoUrl: data['fotoUrl'],
-      dataCriacao: (data['dataCriacao'] as dynamic)?.toDate() ?? DateTime.now(),
-      dataAtualizacao: (data['dataAtualizacao'] as dynamic)?.toDate() ?? DateTime.now(),
+      nome: map['nome'] ?? '',
+      concentracao: map['concentracao'] ?? '',
+      formula: map['formula'] ?? '',
+      componenteBasico: map['componenteBasico'] ?? '',
+      dataCriacao: parseDate(map['dataCriacao']),
+      dataAtualizacao: parseDate(map['dataAtualizacao']),
+      imageUrls: urls,
     );
   }
 
-  // Copiar com mudanças
   MedicamentoFirestoreModel copyWith({
-    String? id,
     String? nome,
     String? concentracao,
     String? formula,
     String? componenteBasico,
-    String? fotoUrl,
-    DateTime? dataCriacao,
     DateTime? dataAtualizacao,
+    List<String>? imageUrls,
   }) {
     return MedicamentoFirestoreModel(
-      id: id ?? this.id,
+      id: id,
       nome: nome ?? this.nome,
       concentracao: concentracao ?? this.concentracao,
       formula: formula ?? this.formula,
       componenteBasico: componenteBasico ?? this.componenteBasico,
-      fotoUrl: fotoUrl ?? this.fotoUrl,
-      dataCriacao: dataCriacao ?? this.dataCriacao,
+      dataCriacao: dataCriacao,
       dataAtualizacao: dataAtualizacao ?? this.dataAtualizacao,
+      imageUrls: imageUrls ?? this.imageUrls,
     );
   }
 }

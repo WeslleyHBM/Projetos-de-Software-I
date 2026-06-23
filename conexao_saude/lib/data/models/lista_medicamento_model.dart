@@ -24,6 +24,8 @@ class MedicamentoModel extends HiveObject {
   int ofensivaAtual;
   @HiveField(9, defaultValue: 0)
   int maiorOfensiva;
+  @HiveField(10)
+  List<String> imageUrls;
 
   MedicamentoModel({
     required this.nome,
@@ -36,6 +38,7 @@ class MedicamentoModel extends HiveObject {
     this.ultimaDose,
     this.ofensivaAtual = 0,
     this.maiorOfensiva = 0,
+    this.imageUrls = const [],
   });
 
   /// Retorna o número de dias de duração do tratamento

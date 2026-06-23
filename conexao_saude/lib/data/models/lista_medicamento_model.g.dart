@@ -27,13 +27,14 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       ultimaDose: fields[7] as DateTime?,
       ofensivaAtual: fields[8] == null ? 0 : fields[8] as int,
       maiorOfensiva: fields[9] == null ? 0 : fields[9] as int,
+      imageUrls: (fields[10] as List).cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, MedicamentoModel obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.nome)
       ..writeByte(1)
@@ -53,7 +54,9 @@ class MedicamentoModelAdapter extends TypeAdapter<MedicamentoModel> {
       ..writeByte(8)
       ..write(obj.ofensivaAtual)
       ..writeByte(9)
-      ..write(obj.maiorOfensiva);
+      ..write(obj.maiorOfensiva)
+      ..writeByte(10)
+      ..write(obj.imageUrls);
   }
 
   @override

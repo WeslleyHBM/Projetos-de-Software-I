@@ -32,8 +32,8 @@ Future<void> main() async {
   await Hive.openBox<ListaMedicamentoModel>('minhas_listas');
 
   // 4. Inicializa o serviço de notificações
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+  //final notificationService = NotificationService();
+  //await notificationService.initialize();
 
   // 5. Reagenda notificações ao iniciar o app (caso tenham sido perdidas)
   await _reagendarNotificacoes();

@@ -36,9 +36,9 @@ class MedicamentoItemCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Material(
-      color: Colors.transparent, // Para o fundo branco não bugar
+      color: Colors.transparent, 
       child: InkWell(
-        onTap: onTap, // Aqui ativamos o clique!
+        onTap: onTap, 
         borderRadius: BorderRadius.circular(16),
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -56,6 +56,7 @@ class MedicamentoItemCard extends StatelessWidget {
             ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start, // Garante que a foto fica sempre alinhada ao topo
             children: [
               _buildImage(),
               const SizedBox(width: 12),
@@ -78,21 +79,20 @@ class MedicamentoItemCard extends StatelessWidget {
                         _InfoChip(icon: Icons.medication_outlined, label: 'Qtd: $quantidade'),
                         Builder(
                           builder: (context) {
-                            final int hour = int.tryParse(hora.split(':').first) ?? 0;
-                            
-                            // AM é menor que 12. PM é 12 ou maior.
-                            final bool isAM = hour >= 6 && hour < 18;  
+                            final String horaSoA = hora.split(':').first;
+                            final int? horaInteira = int.tryParse(horaSoA);
+                            final int horaSegura = horaInteira ?? 8;
+                            final bool isDia = (horaSegura >= 6 && horaSegura < 18); 
                             
                             return _InfoChip(
-                              icon: isAM ? Icons.wb_sunny : Icons.nightlight_round,
-                              iconColor: isAM ? Colors.orange : Colors.blueGrey,
+                              icon: isDia ? Icons.wb_sunny : Icons.nightlight_round,
+                              iconColor: isDia ? Colors.orange : Colors.blueGrey,
                               label: hora,
                             );
                           }
                         ),
                         
-                        _InfoChip(icon: Icons.calendar_month, label: data), 
-                        
+                        _InfoChip(icon: Icons.calendar_today, label: data), 
                         
                         _InfoChip(icon: Icons.check_circle_outline, label: 'Consumidos: $diasConsumidos'),
                         
@@ -108,7 +108,6 @@ class MedicamentoItemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Botões de ação
               if (onEdit != null || onDelete != null)
                 PopupMenuButton<String>(
                   onSelected: (value) {
@@ -164,7 +163,6 @@ class MedicamentoItemCard extends StatelessWidget {
         ),
       );
     }
-
     return _fallbackImage();
   }
 
@@ -189,30 +187,43 @@ class _InfoChip extends StatelessWidget {
   const _InfoChip({
     required this.icon, 
     required this.label, 
-    this.iconColor, // <-- ADICIONADO AO CONSTRUTOR
+    this.iconColor, 
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(999),
+    // =====================================================================
+    // A MÁGICA ACONTECE AQUI:
+    // O ConstrainedBox impede o balãozinho de crescer além de 55% da tela.
+    // O Flexible + TextOverflow.ellipsis coloca os "..." se passar desse limite.
+    // =====================================================================
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.55, 
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: iconColor ?? AppColors.textSecondary),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: iconColor ?? AppColors.textSecondary),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis, 
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

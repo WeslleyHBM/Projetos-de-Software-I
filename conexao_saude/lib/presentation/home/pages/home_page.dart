@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:conexao_saude/core/theme/app_colors.dart';
@@ -84,6 +85,50 @@ class _HomePageState extends State<HomePage> {
     return doseAlvo;
   }
 
+  // ==============================================================
+  // NOVA FUNÇÃO: ABRE A FOTO EM TELA CHEIA COM ZOOM
+  // ==============================================================
+  void _abrirVisualizacaoFotoCompleta(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9), // Fundo preto bem escuro
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero, // Tela cheia
+          child: Stack(
+            children: [
+              // InteractiveViewer permite PINCH TO ZOOM (dois dedos)
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0, // Permite aumentar 4x
+                child: Center(
+                  child: kIsWeb 
+                    ? Image.network(imageUrl, fit: BoxFit.contain)
+                    : Image.network(imageUrl, fit: BoxFit.contain), // Mantém contain para não cortar
+                ),
+              ),
+              // Botão de fechar (X)
+              Positioned(
+                top: 20,
+                right: 20,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, color: Colors.white, size: 30),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  // ==============================================================
+
   void _abrirDialogoTomarRemedio(MedicamentoModel item) {
     showDialog(
       context: context,
@@ -114,27 +159,58 @@ class _HomePageState extends State<HomePage> {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(item.nome, textAlign: TextAlign.center),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    height: 180,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.green.shade200, width: 2),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.medication, size: 80, color: Colors.green),
+              
+              // ==============================================================
+              // O ESCUDO DUPLO:
+              // 1. ConstrainedBox: Impede de ficar gigante no PC/Web
+              // 2. SingleChildScrollView: Impede o erro amarelo do teclado!
+              // ==============================================================
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400), 
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.9, 
+                  child: SingleChildScrollView( // <-- AQUI ESTÁ A MAGIA CONTRA O TECLADO
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          height: 200,
+                          width: double.infinity,
+                          clipBehavior: Clip.hardEdge,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.green.shade200, width: 2),
+                          ),
+                          child: item.imageUrls.isNotEmpty 
+                              ? PageView.builder(
+                                  itemCount: item.imageUrls.length,
+                                  itemBuilder: (context, idx) {
+                                    return GestureDetector(
+                                      onTap: () => _abrirVisualizacaoFotoCompleta(item.imageUrls[idx]),
+                                      child: Container(
+                                        color: Colors.transparent,
+                                        child: Image.network(
+                                          item.imageUrls[idx], 
+                                          fit: BoxFit.contain, 
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : const Center(child: Icon(Icons.medication_liquid, size: 80, color: Colors.green)),
+                        ),
+                        const SizedBox(height: 16),
+                        Text('Dose: ${item.dose}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        Text(mensagemStatus, textAlign: TextAlign.center, style: TextStyle(color: corStatus, fontWeight: FontWeight.bold)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text('Dose: ${item.dose}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Text(mensagemStatus, textAlign: TextAlign.center, style: TextStyle(color: corStatus, fontWeight: FontWeight.bold)),
-                ],
+                ),
               ),
+              // ==============================================================
+              
               actionsAlignment: MainAxisAlignment.center,
               actions: [
                 TextButton(
@@ -175,16 +251,11 @@ class _HomePageState extends State<HomePage> {
                         if (novaOfensiva > novoRecorde) novoRecorde = novaOfensiva;
 
                         medicamentos[index] = MedicamentoModel(
-                          nome: medAntigo.nome,
-                          dose: medAntigo.dose,
-                          horario: medAntigo.horario,
-                          dataInicio: medAntigo.dataInicio,
-                          dataFim: medAntigo.dataFim,
-                          intervaloHoras: medAntigo.intervaloHoras,
-                          diasConsumidos: medAntigo.diasConsumidos + 1,
-                          ultimaDose: instanteAtual,
-                          ofensivaAtual: novaOfensiva,   
-                          maiorOfensiva: novoRecorde,    
+                          nome: medAntigo.nome, dose: medAntigo.dose, horario: medAntigo.horario,
+                          dataInicio: medAntigo.dataInicio, dataFim: medAntigo.dataFim,
+                          intervaloHoras: medAntigo.intervaloHoras, diasConsumidos: medAntigo.diasConsumidos + 1,
+                          ultimaDose: instanteAtual, ofensivaAtual: novaOfensiva, maiorOfensiva: novoRecorde,    
+                          imageUrls: medAntigo.imageUrls, 
                         );
 
                         await _listasBox.put(_listaHomeKey, ListaMedicamentoModel(titulo: lista.titulo, medicamentos: medicamentos));
@@ -258,22 +329,24 @@ class _HomePageState extends State<HomePage> {
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Editar ${item.nome}'),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9,
-            child: SingleChildScrollView(
+        builder: (dialogCtx, setDialogState) => Dialog(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
               child: Column(
-                mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('Editar ${item.nome}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
                   TextField(controller: doseController, decoration: const InputDecoration(labelText: 'Dose')),
                   const SizedBox(height: 16),
                   const Text('Horário Base', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  InkWell(
+                  GestureDetector(
                     onTap: () {
                       showModalBottomSheet(
-                        context: context,
+                        context: dialogCtx,
                         builder: (BuildContext builder) {
                           return SizedBox(height: 250, child: CupertinoDatePicker(mode: CupertinoDatePickerMode.time, use24hFormat: false, initialDateTime: horarioSelecionado, onDateTimeChanged: (DateTime novaHora) { setDialogState(() { horarioSelecionado = novaHora; }); }));
                         },
@@ -298,12 +371,16 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       Expanded(child: Text(_formatarData(dataInicio))),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final data = await showDatePicker(context: context, initialDate: dataInicio, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 365)));
-                          if (data != null) { setDialogState(() { dataInicio = data; if (dataFim.isBefore(dataInicio)) dataFim = dataInicio.add(const Duration(days: 30)); }); }
-                        },
-                        child: const Text('Alterar'),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = await showDatePicker(context: dialogCtx, initialDate: dataInicio, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 365)));
+                            if (data != null) { setDialogState(() { dataInicio = data; if (dataFim.isBefore(dataInicio)) dataFim = dataInicio.add(const Duration(days: 30)); }); }
+                          },
+                          child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Alterar')),
+                        ),
                       ),
                     ],
                   ),
@@ -313,38 +390,61 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       Expanded(child: Text(_formatarData(dataFim))),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final data = await showDatePicker(context: context, initialDate: dataFim, firstDate: dataInicio, lastDate: DateTime.now().add(const Duration(days: 365)));
-                          if (data != null) setDialogState(() { dataFim = data; });
-                        },
-                        child: const Text('Alterar'),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final data = await showDatePicker(context: dialogCtx, initialDate: dataFim, firstDate: dataInicio, lastDate: DateTime.now().add(const Duration(days: 365)));
+                            if (data != null) setDialogState(() { dataFim = data; });
+                          },
+                          child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Alterar')),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   const Text('Intervalo (horas)', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  DropdownButton<int>(
-                    value: intervaloHoras, isExpanded: true,
-                    items: [4, 6, 8, 12, 24].map((valor) => DropdownMenuItem(value: valor, child: Text('$valor horas'))).toList(),
-                    onChanged: (valor) { setDialogState(() { intervaloHoras = valor ?? 8; }); },
+                  SizedBox(
+                    width: double.infinity,
+                    child: DropdownButton<int>(
+                      value: intervaloHoras, isExpanded: true,
+                      items: [4, 6, 8, 12, 24].map((valor) => DropdownMenuItem(value: valor, child: Text('$valor horas'))).toList(),
+                      onChanged: (valor) { setDialogState(() { intervaloHoras = valor ?? 8; }); },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        width: 90,
+                        child: TextButton(onPressed: () => Navigator.of(dialogCtx).pop(false), child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Cancelar'))),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 90,
+                        child: ElevatedButton(onPressed: () => Navigator.of(dialogCtx).pop(true), child: FittedBox(fit: BoxFit.scaleDown, child: const Text('Salvar'))),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancelar')),
-            ElevatedButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Salvar')),
-          ],
         ),
       ),
     );
 
     if (confirmado != true) return;
+    
     final dose = doseController.text.trim();
-    if (dose.isEmpty) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha a dose.'))); return; }
+    if (dose.isEmpty) { 
+      if (!mounted) return; 
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha a dose.'))); 
+      return; 
+    }
 
     final listaAtual = _listasBox.get(_listaHomeKey);
     if (listaAtual == null) return;
@@ -354,12 +454,17 @@ class _HomePageState extends State<HomePage> {
     if (indiceMedicamento == -1) return;
 
     medicamentos[indiceMedicamento] = MedicamentoModel(
-      nome: item.nome, dose: dose,
+      nome: item.nome, 
+      dose: dose,
       horario: '${horarioSelecionado.hour.toString().padLeft(2, '0')}:${horarioSelecionado.minute.toString().padLeft(2, '0')}',
-      dataInicio: dataInicio, dataFim: dataFim, intervaloHoras: intervaloHoras,
-      diasConsumidos: item.diasConsumidos, ultimaDose: item.ultimaDose,
+      dataInicio: dataInicio, 
+      dataFim: dataFim, 
+      intervaloHoras: intervaloHoras,
+      diasConsumidos: item.diasConsumidos, 
+      ultimaDose: item.ultimaDose,
       ofensivaAtual: item.ofensivaAtual, 
       maiorOfensiva: item.maiorOfensiva, 
+      imageUrls: item.imageUrls,
     );
 
     await _listasBox.put(_listaHomeKey, ListaMedicamentoModel(titulo: 'Lista inicial', medicamentos: medicamentos));
@@ -482,7 +587,7 @@ class _HomePageState extends State<HomePage> {
                         final String horaExibicao = '${doseAlvo.hour.toString().padLeft(2, '0')}:${doseAlvo.minute.toString().padLeft(2, '0')}';
                         
                         return MedicamentoItemCard(
-                          nome: item.nome, quantidade: item.dose, hora: horaExibicao, data: dataHoje, diasConsumidos: item.diasConsumidos, duracao: '$duracaoDias dias', dataInicio: _formatarData(item.dataInicio), dataFim: _formatarData(item.dataFim), imageUrl: null,
+                          nome: item.nome, quantidade: item.dose, hora: horaExibicao, data: dataHoje, diasConsumidos: item.diasConsumidos, duracao: '$duracaoDias dias', dataInicio: _formatarData(item.dataInicio), dataFim: _formatarData(item.dataFim), imageUrl: item.imageUrls.isNotEmpty ? item.imageUrls.first : null,
                           onTap: () { _abrirDialogoTomarRemedio(item); },
                           onEdit: () { _abrirDialogoEditar(item, entry.key); },
                           onDelete: () { _removerMedicamento(item); },

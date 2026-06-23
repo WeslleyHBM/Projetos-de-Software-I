@@ -69,10 +69,6 @@ class _AdminPageState extends State<AdminPage> {
           );
         },
         build: (pw.Context context) {
-          // =================================================================
-          // A MÁGICA ACONTECE AQUI: Uma lista plana e "solta" de widgets!
-          // Isso impede que o PDF trave ao tentar cortar a página.
-          // =================================================================
           final List<pw.Widget> elementosPDF = []; 
 
           for (var item in listaAtual.medicamentos) {
@@ -92,7 +88,6 @@ class _AdminPageState extends State<AdminPage> {
             List<DateTime> todasAsDoses = [];
             
             int limiteDoses = 0;
-            // Aumentei o limite de segurança para suportar tratamentos longos
             while (doseAtual.isBefore(item.dataFim) && limiteDoses < 200) {
               todasAsDoses.add(doseAtual);
               doseAtual = doseAtual.add(Duration(hours: intervalo));
@@ -116,6 +111,33 @@ class _AdminPageState extends State<AdminPage> {
               )
             );
             elementosPDF.add(pw.SizedBox(height: 16));
+
+            // =================================================================
+            // NOVA SECÇÃO: LINHAS PARA OBSERVAÇÕES MÉDICAS
+            // =================================================================
+            elementosPDF.add(
+              pw.Text(
+                'Observações:', 
+                style: pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic, color: PdfColors.grey600)
+              )
+            );
+            elementosPDF.add(pw.SizedBox(height: 6));
+            
+            // Desenha 3 linhas seguidas com espaçamento
+            for (int k = 0; k < 3; k++) {
+              elementosPDF.add(
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(bottom: 14),
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(
+                      bottom: pw.BorderSide(color: PdfColors.grey400, width: 1) // Desenha só a linha de baixo
+                    )
+                  ),
+                )
+              );
+            }
+            elementosPDF.add(pw.SizedBox(height: 12));
+            // =================================================================
 
             // 3. Linhas da Grelha de Quadradinhos
             const int numeroDeColunas = 3; 
@@ -188,7 +210,7 @@ class _AdminPageState extends State<AdminPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView( // Adicionado para dar scroll caso a tela seja pequena
+        child: SingleChildScrollView( 
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -199,7 +221,7 @@ class _AdminPageState extends State<AdminPage> {
               ),
               const SizedBox(height: 24),
 
-              // CARD 1: Adicionar/Remover do Paciente (Toda a lógica antiga de adicionar do catálogo vem pra cá!)
+              // CARD 1: Adicionar/Remover do Paciente 
               _AdminActionCard(
                 titulo: 'Receita do Paciente',
                 subtitulo: 'Adicionar ou remover remédios da rotina diária.',
@@ -259,13 +281,13 @@ class _AdminPageState extends State<AdminPage> {
               ),
               const SizedBox(height: 16),
 
-              // CARD 4: NOVO CARD DE EXPORTAR PDF
+              // CARD 4: EXPORTAR PDF
               _AdminActionCard(
                 titulo: 'Exportar Receita em PDF',
                 subtitulo: 'Gerar arquivo PDF com doses e horários para baixar.',
                 icone: Icons.picture_as_pdf,
                 cor: Colors.red,
-                onTap: () => _gerarEBaixarPDF(context), // Ativa a função do PDF
+                onTap: () => _gerarEBaixarPDF(context), 
               ),
             ],
           ),
